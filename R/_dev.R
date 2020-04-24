@@ -28,21 +28,25 @@ path_export <- file.path(path_onedrive, "data/linelist/HIS-export")
 
 ll_template <- names(readxl::read_xlsx(file.path(path_dictionaries, "ll_template_v1.1.xlsx")))
 
+path_shapefiles <- file.path(path_onedrive, "data/shapefiles")
+
+
 
 
 ################################################################################
-#### Update data
+#### Update compiled linelist
 ## Import and combine linelists from each site, clean and check variables,
 ## geo-match, and write resulting cleaned linelist files
 ################################################################################
 
-source("R/update_data.R")
+source("R/update.R")
 
-d <- update_data(path_data_raw = path_data_raw,
-                 dict_facilities = dict_facilities,
-                 dict_factors = dict_factors,
-                 ll_template = ll_template,
-                 country = "AFG")
+d <- update_linelist(path_data_raw = path_data_raw,
+                     path_shapefiles = path_shapefiles,
+                     dict_facilities = dict_facilities,
+                     dict_factors = dict_factors,
+                     ll_template = ll_template,
+                     country = "AFG")
 
 
 ## write cleaned linelist files to Sharepoint data directory
@@ -52,9 +56,9 @@ d <- update_data(path_data_raw = path_data_raw,
 # writexl::write_xlsx(d, path_out_covid_ll)
 # feather::write_feather(d, path_out_covid_ll_feather)
 
-OC <- "OCA"
+OC <- "oca"
 
-path_out_oc <- file.path(path_export, OC, glue("msf_covid19_linelist_oca_{lubridate::today()}"))
+path_out_oc <- file.path(path_export, OC, glue("msf_covid19_linelist_{OC}_{lubridate::today()}"))
 
 write.csv(d, paste0(path_out_oc, ".csv"), row.names = FALSE)
 write_pretty_xlsx(d, paste0(path_out_oc, ".xlsx"))

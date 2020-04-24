@@ -1,4 +1,4 @@
-#' Update data
+#' Update compiled linelist
 #'
 #' @param path_data_raw Path to directory with raw linelist files
 #' @param dict_facilities 
@@ -17,22 +17,24 @@
 #' - 'TC_ETC' is filtered to TC/ETC sites
 #' - 'CTD' is filtered to CTDs
 #' 
-update_data <- function(path_data_raw,
-                        # path_cleaning_checks,
-                        # path_geocode_edit,
-                        # path_geocode_correct,
-                        dict_facilities,
-                        dict_factors,
-                        ll_template,
-                        country,
-                        run_cleaning = TRUE,
-                        write_checks = TRUE,
-                        verbose_import = TRUE) {
+update_linelist <- function(path_data_raw,
+                            path_shapefiles,
+                            # path_cleaning_checks,
+                            # path_geocode_edit,
+                            # path_geocode_correct,
+                            dict_facilities,
+                            dict_factors,
+                            ll_template,
+                            country,
+                            run_cleaning = TRUE,
+                            write_checks = TRUE,
+                            verbose_import = TRUE) {
   
   ## requires
   library(feather)
   library(dplyr)
   library(tidyr)
+  library(purrr)
   library(glue)
   source("R/import.R")
   source("R/clean_linelist.R")
@@ -93,7 +95,9 @@ update_data <- function(path_data_raw,
   
   df_data_geocleaned <- clean_geo(
     df_data = df_data_geoclean_prep,
-    path_cleaning = path_cleaning
+    path_cleaning = path_cleaning,
+    path_shapefiles = path_shapefiles,
+    country = country
   )
   
   

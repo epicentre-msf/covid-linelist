@@ -8,12 +8,16 @@
 #'
 #' @examples
 clean_geo <- function(df_data,
-                      path_cleaning) {
+                      path_cleaning,
+                      path_shapefiles,
+                      country) {
   
   ## requires
   library(dplyr)
+  library(glue)
   library(janitor)
-  source("R/clean_linelist_geo.R")  
+  source("R/clean_linelist_geo.R")
+  source("R/utilities.R")
   
   
   ## when running manually
@@ -23,11 +27,7 @@ clean_geo <- function(df_data,
   
   
   ## load reference DB
-  df_geo_ref <- readRDS("rds/adm_ref_afg.rds") %>%
-    mutate(adm4 = NA_character_) %>% 
-    select(level, adm1, adm2, adm3, adm4, pcode) %>% 
-    distinct()
-  
+  df_geo_ref <- readRDS(file.path(path_shapefiles, country, glue("adm_reference_{country}.rds")))
   
   ## manual corrections
   df_manual_check_full <- list_files(path_cleaning, "geocodes_check", full.names = TRUE) %>%
@@ -41,7 +41,7 @@ clean_geo <- function(df_data,
   
   df_geo_raw <- df_data %>% 
     select(matches("^adm[1234]_name")) %>% 
-    unique() %>% 
+    unique() %>%
     setNames(gsub("_name__res", "", names(.)))
 
   raw_names <- names(df_geo_raw)
@@ -105,7 +105,6 @@ clean_geo <- function(df_data,
     setNames(gsub("__res_ref$", "__res", names(.))) %>% 
     setNames(gsub("_pcode$", "_pcode__res", names(.))) %>% 
     arrange(db_row)
-  
   
   return(df_out)
 }
