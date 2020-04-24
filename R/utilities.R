@@ -1,4 +1,22 @@
 
+
+add_na_dict <- function(d) {
+  dplyr::bind_rows(
+    d,
+    tibble::tibble(values_en = NA, variable_en = unique(d$variable_en))
+  )
+}
+
+
+string_to_numeric_prep <- function(x) {
+  x %>%
+    stringr::str_to_lower() %>%
+    stringr::str_replace("[,;/]+", ".") %>%
+    # recode(!!!dict_numeric) %>%
+    stringr::str_replace("^\\.$", NA_character_)
+}
+
+
 paste_collapse <- function(x, y, collapse = "; ") {
   z <- c(x, y)
   paste(z[!is.na(z)], collapse = collapse)
@@ -181,8 +199,6 @@ numeric_within_error <- function(x, range_max) {
 }
 
 
-
-
 names_within_error <- function(x, dist_range_max) {
   # takes a vector of proper names and determines whether the stringdist between
   #  all pairs is less than a given threshold (i.e. whether all the names are all
@@ -194,34 +210,6 @@ names_within_error <- function(x, dist_range_max) {
   )
   min_distances <- apply(similarity_metrics, 2, min, na.rm = TRUE)
   ifelse(all(min_distances <= dist_range_max), TRUE, FALSE)
-}
-
-
-string_sort <- function(x, sep = "[[:space:]]+") {
-  # alphabetically sort the words within a string
-  xx <- strsplit(x, sep)[[1]]
-  paste(sort(xx), collapse = " ")
-}
-
-
-string_n_terms <- function(x) {
-  # count number of terms within a string (where terms are separated by one or
-  #  more space)
-  xx <- strsplit(x, "[[:space:]]+")[[1]]
-  length(xx)
-}
-
-
-string_combinations <- function(x, m) {
-  # generate all combinations of m terms from a string (x)
-  # if x contains fewer than m terms, returns NA
-  xx <- strsplit(x, "[[:space:]]+")[[1]]
-  if (length(xx) >= m) {
-    yy <- t(utils::combn(xx, m))
-    return(apply(yy, 1, function(x) paste(sort(x), collapse = " ")))
-  } else {
-    return(NA)
-  }
 }
 
 
@@ -286,15 +274,15 @@ format_text <- function(x) {
 ## convert age to years
 age_to_years_scalar <- function(value, unit) {
   switch(tolower(unit),
-         "months" = value / 12,
-         "weeks" = value / 52,
-         "days" = value / 365,
+         "Year" = value,
+         "Month" = value / 12,
+         "Day" = value / 365.25,
          value)
 }
 
 age_to_years <- function(value, unit) {
-  if (!all(tolower(unit) %in% c("years", "months", "weeks", "days", NA_character_))) {
-    warning("unit must be 'years', 'months', 'weeks', 'days', or NA (case-insensitive)")
+  if (!all(tolower(unit) %in% c("year", "month", "day", NA_character_))) {
+    warning("unit must be 'year', 'month', 'day', or NA (case-insensitive)")
   }
   mapply(age_to_years_scalar, value, unit)
 }
@@ -332,170 +320,6 @@ write_pretty_xlsx <- function(x, file, fill = "#ffcccb", date_format = "yyyy-mm-
   suppressMessages(openxlsx::saveWorkbook(wb, file = file, overwrite = overwrite))
 }
 
-
-
-
-################################################################################
-## Functions moved from app/utils.R
-################################################################################
-
-complete_epiweek <- function(df, var_epiweek_date, ...) {
-  library(rlang)
-  library(dplyr)
-  library(tidyr)
-  
-  var_epiweek_date_enq <- enquo(var_epiweek_date)
-  var_nested_enq <- quos(...)
-  
-  var_not_gathered_enq <- c(var_epiweek_date_enq, var_nested_enq)
-  
-  var_epiweek_date_name <- quo_name(var_epiweek_date_enq)
-  var_nested_name <- sapply(var_nested_enq, rlang::quo_name)
-  
-  df %>%
-    tidyr::gather(variable, value, -c(!!!var_not_gathered_enq)) %>%
-    tidyr::complete(nesting_(!!var_nested_name),
-                    !!var_epiweek_date_name := tidyr::full_seq(!!var_epiweek_date_enq, period = 7),
-                    variable, fill = list(value = 0)) %>%
-    tidyr::spread(variable, value)
-}
-
-
-make_epiweek_label <- function(epiweek_date) {
-  library(lubridate)
-  library(stringr)
-  sprintf("%s-W%s",
-          lubridate::isoyear(epiweek_date),
-          stringr::str_sub(100 + lubridate::isoweek(epiweek_date), 2L, 3L))
-}
-
-
-make_epiweek_date <- function(date) {
-  library(lubridate)
-  lubridate::wday(date, week_start = 1) <- 7
-  return(date)
-}
-
-
-
-anonymise_data <- function(df) {
-  library(dplyr)
-  dplyr::select(df,
-                -contains("patient_name"),
-                -contains("phone"),
-                -ends_with("_details"),
-                -contains("infector_name"),
-                -contains("comment"),
-                -contains("longitude"),
-                -contains("latitude"))
-}
-
-
-is_yn_var <- function(x) {
-  all(x %in% c("Yes", "No", "Unknown", NA_character_)) & !all(is.na(x))
-}
-
-
-is_PNI_var <- function(x) {
-  all(x %in% c("Positive", "Negative", "Inconclusive", NA_character_)) & !all(is.na(x))
-}
-
-
-recode_yn_FR <- function(x) {
-  library(dplyr)
-  dplyr::recode(x, Yes = "Oui", No = "Non", Unknown = "Inc.")
-}
-
-
-recode_PNI_FR <- function(x) {
-  library(dplyr)
-  dplyr::recode(x, Positive = "Positif", Negative = "Négatif", Inconclusive = "Inconclusif")
-}
-
-
-translate_EN2FR <- function(df) {
-  library(dplyr)
-  df %>%
-    dplyr::mutate(
-      EVD_status = EVD_status %>% dplyr::recode(
-        Suspect = "Suspect",
-        Unknown = NA_character_,
-        Confirmed = "Confirmé",
-        `Not a case` = "Non cas"
-      ),
-      vaccination_rvsv_yn = vaccination_rvsv_yn %>% dplyr::recode(
-        `Not vaccinated` = "Non",
-        Unknown = "Inc.",
-        Vaccinated = "Oui"
-      ),
-      treatment_yn = treatment_yn %>% dplyr::recode(
-        Yes = "Oui",
-        No = "Non"
-      ),
-      treatment = treatment %>% dplyr::recode(
-        `Not treated` = NA_character_
-      ),
-      type_of_exit = type_of_exit %>% dplyr::recode(
-        `Cured` = "Guéri",
-        `Died` = "Décédé",
-        `Lost to follow-up` = "Abandon",
-        `Sent back home (not a case)` = "Retour a la maison (non cas)",
-        `Transferred` = "Transféré",
-        `Transferred (not a case)` = "Transféré (non cas)",
-        `Transferred to ETC` = "Transféré au CTE",
-        `Still treated/Unknown` = NA_character_
-      ),
-      age_unit = age_unit %>% dplyr::recode(
-        Days = "Jour",
-        Months = "Mois",
-        Unknown = NA_character_,
-        Years = "Ans"
-      ),
-      sex = sex %>% dplyr::recode(
-        Female = "F",
-        Male = "M",
-        Unknown = NA_character_
-      )
-    ) %>%
-    dplyr::mutate_if(is_yn_var, recode_yn_FR) %>%
-    dplyr::mutate_if(is_PNI_var, recode_PNI_FR)
-}
-
-
-
-name_permutations <- function(x,
-                              m = 2,
-                              to.lower = TRUE,
-                              to.ascii = TRUE,
-                              terms.omit = NULL) {
-  
-  ## standardize
-  if (to.lower) {
-    x <- tolower(x)
-    terms.omit <- tolower(terms.omit)
-  } 
-  if (to.ascii) {
-    x <- stringi::stri_trans_general(x, id = "Latin-ASCII")
-    terms.omit <- stringi::stri_trans_general(terms.omit, id = "Latin-ASCII")
-  }
-  
-  ## split
-  xx <- strsplit(x, "[[:space:]]+")[[1]]
-  
-  ## combinations
-  xx_sub <- xx[!is.na(xx) & nchar(xx) > 2 & !xx %in% terms.omit]
-  x_combn <- if (length(xx_sub) >= m) {
-    apply(t(combn(xx_sub, m)), 1, function(x) paste(sort(x), collapse = " "))
-  } else {
-    NULL
-  }
-  
-  ## simple sort
-  x_sorted <- paste(sort(xx), collapse = " ")
-  
-  ## return uniques
-  return(unique(c(x, x_sorted, x_combn)))
-}
 
 
 
