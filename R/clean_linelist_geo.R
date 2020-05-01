@@ -30,7 +30,7 @@ clean_geo <- function(df_data,
   df_geo_ref <- readRDS(file.path(path_shapefiles, country, glue("adm_reference_{country}.rds")))
   
   ## manual corrections
-  df_manual_check_full <- list_files(path_cleaning, "geocodes_check", full.names = TRUE) %>%
+  df_manual_check_full <- list_files(file.path(path_cleaning, country), "geocodes_check", full.names = TRUE) %>%
     lapply(read_geo_manual) %>%
     dplyr::bind_rows() %>%
     mutate_all(as.character) %>% 
@@ -38,6 +38,8 @@ clean_geo <- function(df_data,
 
   df_geo_manual <- df_manual_check_full %>%
     filter(!is.na(pcode))
+  
+  if (nrow(df_geo_manual) == 0) df_geo_manual <- NULL
   
   df_geo_raw <- df_data %>% 
     select(matches("^adm[1234]_name")) %>% 
@@ -54,33 +56,40 @@ clean_geo <- function(df_data,
                                   code_col = "pcode") %>% 
     select(-level)
   
-  
   ## write file for manual correction
   df_manual_check_full_join <- df_manual_check_full %>%
     select(starts_with("adm"))
   
+  if (nrow(df_manual_check_full_join) == 0) {
+    df_manual_check_full_join <- tibble(
+      adm1 = character(0),
+      adm2 = character(0),
+      adm3 = character(0),
+      adm4 = character(0)
+    )
+  }
+  
   out_check <- df_match_best %>% 
     anti_join(df_manual_check_full_join, by = raw_names) %>%
     filter(is.na(match_type) | match_type %in% c("best_single", "best_multi")) %>% 
-    mutate(level_raw = best_geolevel(., "_name$"),
-           level_ref = best_geolevel(., "^adm[[:digit:]]$")) %>% 
+    mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
+           level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
     arrange(level_ref, adm1, adm2, adm3, adm4) %>% 
     mutate(pcode_new = NA_character_, comment = NA_character_)
   
   if (nrow(out_check) > 0) {
     write_pretty_xlsx(out_check,
-                      file = file.path(path_cleaning, sprintf("geocodes_check_%s.xlsx", time_stamp())),
+                      file = file.path(file.path(path_cleaning, country), sprintf("geocodes_check_%s.xlsx", time_stamp())),
                       group_shade = "level_ref", zoom = 145)
   }
   
   message(nrow(out_check), " new ambiguous geocodes found")
   
-  
   pcode_bind <- df_match_best %>% 
     filter(!is.na(pcode)) %>% 
     select(starts_with("adm"), pcode) %>% 
     expand_geocode(., "pcode")
-
+  
   df_geo_pcode <- df_geo_raw %>% 
     left_join(pcode_bind, by = raw_names) %>% 
     filter(!is.na(pcode)) %>% 

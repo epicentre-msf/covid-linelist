@@ -20,7 +20,7 @@ import_linelists <- function(path_data_raw,
   source("R/import.R")
 
   if (FALSE) {
-    country <- "AFG"
+    country <- "KEN"
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -74,7 +74,7 @@ scan_sheets <- function(path_data_raw, country) {
   library(tidyr)
   
   if (FALSE) {
-    country <- "AFG"
+    country <- "NGA"
   }
   
   path_data_raw_country <- file.path(path_data_raw, country)
@@ -85,7 +85,7 @@ scan_sheets <- function(path_data_raw, country) {
     tidyr::separate(path_parse,
                     c("country", "OC", "project", "site_type", "site_name",
                       "site_longitude", "site_latitude", "upload_date"),
-                    sep = "__+") %>% 
+                    sep = "_{1,3}") %>% 
     group_by(country, OC, project) %>%
     filter(upload_date == max(upload_date, na.rm = TRUE)) %>% 
     filter(file_path == max(file_path)) %>%  # avoid multi-export duplicates
@@ -127,7 +127,7 @@ read_and_prepare_data <- function(file_path) {
   df %>% 
     dplyr::as_tibble() %>% 
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
-    janitor::remove_empty(which = c("rows", "cols")) %>%
+    janitor::remove_empty(which = c("rows")) %>%
     mutate(linelist_row = 1:n()) %>% 
     select(linelist_row, everything())
 }

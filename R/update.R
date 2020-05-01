@@ -24,6 +24,7 @@ update_linelist <- function(path_data_raw,
                             # path_geocode_correct,
                             dict_facilities,
                             dict_factors,
+                            dict_factors_correct,
                             ll_template,
                             country,
                             run_cleaning = TRUE,
@@ -63,7 +64,8 @@ update_linelist <- function(path_data_raw,
     # full linelist cleaning
     df_data_clean <- clean_linelist(df_data_raw,
                                     dict_factors = dict_factors,
-                                    # path_cleaning_checks,
+                                    dict_factors_correct = dict_factors_correct,
+                                    path_cleaning,
                                     # path_dictionaries,
                                     write_checks = write_checks)
     
@@ -72,12 +74,12 @@ update_linelist <- function(path_data_raw,
       mutate(age_in_years = map2_dbl(patinfo_ageonset, patinfo_ageonsetunit, age_to_years))
     
     # write cleaned linelist to file
-    feather::write_feather(df_data_clean_derived, "local/df_data_cleaned.feather")
+    saveRDS(df_data_clean_derived, glue::glue("local/df_data_cleaned_{country}.rds"))
 
   } else {
     
     # else skip cleaning and use last-written data
-    df_data_clean_derived <- feather::read_feather("local/df_data_cleaned.feather")
+    df_data_clean_derived <- readRDS(glue::glue("local/df_data_cleaned_{country}.rds"))
   }
   
   
@@ -93,6 +95,12 @@ update_linelist <- function(path_data_raw,
                     remove = FALSE) %>% 
     select(all_of(col_order), matches("^adm[[:digit:]]_name"))
   
+  # quick hack for Kenya
+  if (country == "KEN") {
+    df_data_geoclean_prep <- df_data_geoclean_prep %>% 
+      mutate(adm1_name__res = ifelse(adm1_name__res == "Nairobi City", "Nairobi", adm1_name__res))
+  }
+  
   df_data_geocleaned <- clean_geo(
     df_data = df_data_geoclean_prep,
     path_cleaning = path_cleaning,
@@ -100,8 +108,7 @@ update_linelist <- function(path_data_raw,
     country = country
   )
   
-  
-  #### return compiled linelists
+  ## return compiled linelist
   return(df_data_geocleaned)
 }
 

@@ -8,9 +8,10 @@
 #' Cleaned linelist
 #' 
 clean_linelist <- function(df_data,
-                           # path_cleaning_checks,
+                           path_cleaning,
                            # path_dictionaries,
                            dict_factors,
+                           dict_factors_correct,
                            write_checks) {
 
   ## requires
@@ -29,7 +30,7 @@ clean_linelist <- function(df_data,
   ## if running manually
   if (FALSE) {
     df_data <- df_data_raw
-    write_checks <- FALSE
+    write_checks <- TRUE
   }
   
   
@@ -63,6 +64,7 @@ clean_linelist <- function(df_data,
     select(-value) %>%
     spread(variable, num_value)
   
+  
   ## insert cleaned numeric columns back into df_data
   df_data_cleaned_numeric <- left_join_replace(df_data,
                                                dat_numeric_merge,
@@ -77,9 +79,17 @@ clean_linelist <- function(df_data,
   
   
   ## recode variables using linelist::clean_variable_spelling()
-  df_data_cleaned_factors <- df_dat_cleaned_dates %>% 
-    mutate_at(vars(Comcond_present), as.logical)
+  dict_factors_prep <- dict_factors %>% 
+    select(var = variable_en, val = values_en) %>% 
+    mutate(val_clean = hmatch::string_std(val)) %>% 
+    select(val_clean, val, var)
   
+  cols_factor <- unique(dict_factors_prep$var)
+  
+  df_data_cleaned_factors <- df_dat_cleaned_dates %>% 
+    mutate_at(cols_factor, hmatch::string_std) %>% 
+    linelist::clean_variable_spelling(wordlists = dict_factors_prep) %>% 
+    linelist::clean_variable_spelling(wordlists = dict_factors_correct)
   
   ## arrange columns
   df_dat_cleaned <- df_data_cleaned_factors[,col_order]
@@ -92,7 +102,6 @@ clean_linelist <- function(df_data,
     ungroup()
   
   repi::test_if_valid_multi(df_dat_cleaned, dict_valid)
-  
   
   
   ## return
