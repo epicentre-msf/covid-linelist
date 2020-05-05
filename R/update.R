@@ -12,16 +12,10 @@
 #'   (defaults to \code{TRUE})
 #'
 #' @return
-#' List with two elements, each reflecting up-to-date cleaned linelists (of
-#' class \code{tibble}):
-#' - 'TC_ETC' is filtered to TC/ETC sites
-#' - 'CTD' is filtered to CTDs
+#' Tibble reflecting the up-to-date cleaned linelists
 #' 
 update_linelist <- function(path_data_raw,
                             path_shapefiles,
-                            # path_cleaning_checks,
-                            # path_geocode_edit,
-                            # path_geocode_correct,
                             dict_facilities,
                             dict_factors,
                             dict_factors_correct,
@@ -32,7 +26,6 @@ update_linelist <- function(path_data_raw,
                             verbose_import = TRUE) {
   
   ## requires
-  library(feather)
   library(dplyr)
   library(tidyr)
   library(purrr)
@@ -48,7 +41,6 @@ update_linelist <- function(path_data_raw,
     run_duplicates <- TRUE
     write_checks <- FALSE
     verbose_import <- FALSE
-    country <- "AFG"
   }
   
   
@@ -85,7 +77,7 @@ update_linelist <- function(path_data_raw,
   
   ## geo-cleaning
   col_order <- names(df_data_clean_derived)
-  adm_cols <- glue::glue("adm{1:4}_name__res")
+  adm_cols <- paste0("adm", 1:4, "_name__res")
   
   df_data_geoclean_prep <- df_data_clean_derived %>% 
     tidyr::separate(MSF_admin_location_past_week,
@@ -95,21 +87,13 @@ update_linelist <- function(path_data_raw,
                     remove = FALSE) %>% 
     select(all_of(col_order), matches("^adm[[:digit:]]_name"))
   
-  # quick hack for Kenya
-  if (country == "KEN") {
-    df_data_geoclean_prep <- df_data_geoclean_prep %>% 
-      mutate(adm1_name__res = ifelse(adm1_name__res == "Nairobi City", "Nairobi", adm1_name__res))
-  }
+  df_data_geocleaned <- clean_geo(df_data = df_data_geoclean_prep,
+                                  path_cleaning = path_cleaning,
+                                  path_shapefiles = path_shapefiles,
+                                  country = country)
   
-  df_data_geocleaned <- clean_geo(
-    df_data = df_data_geoclean_prep,
-    path_cleaning = path_cleaning,
-    path_shapefiles = path_shapefiles,
-    country = country
-  )
   
   ## return compiled linelist
   return(df_data_geocleaned)
 }
-
 

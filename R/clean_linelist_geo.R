@@ -27,19 +27,31 @@ clean_geo <- function(df_data,
   
   
   ## load reference DB
-  df_geo_ref <- readRDS(file.path(path_shapefiles, country, glue("adm_reference_{country}.rds")))
+  df_geo_ref <- file.path(path_shapefiles, country, glue("adm_reference_{country}.rds")) %>% 
+    readRDS()
   
   ## manual corrections
-  df_manual_check_full <- list_files(file.path(path_cleaning, country), "geocodes_check", full.names = TRUE) %>%
+  file_recode <- file.path(path_cleaning, country) %>% 
+    list_files(pattern = glue::glue("geocodes_recode_{country}"), full.names = TRUE, last.sorted = TRUE)
+  
+  dict_recode <- if (length(file_recode) == 1) {
+    readxl::read_xlsx(file_recode)
+  } else {
+    NULL
+  }
+  
+  df_manual_check_full <- file.path(path_cleaning, country) %>% 
+    list_files(., pattern = glue::glue("geocodes_check_{country}"), full.names = TRUE) %>%
     lapply(read_geo_manual) %>%
     dplyr::bind_rows() %>%
     mutate_all(as.character) %>% 
     unique()
 
-  df_geo_manual <- df_manual_check_full %>%
-    filter(!is.na(pcode))
-  
-  if (nrow(df_geo_manual) == 0) df_geo_manual <- NULL
+  df_geo_manual <- if (nrow(df_manual_check_full) && any(!is.na(df_manual_check_full$pcode))) {
+    filter(df_manual_check_full, !is.na(pcode))
+  } else {
+    NULL
+  }
   
   df_geo_raw <- df_data %>% 
     select(matches("^adm[1234]_name")) %>% 
@@ -52,6 +64,7 @@ clean_geo <- function(df_data,
                                   ref = df_geo_ref,
                                   man = df_geo_manual,
                                   pattern_raw = "^adm",
+                                  dict = dict_recode,
                                   fuzzy = TRUE,
                                   code_col = "pcode") %>% 
     select(-level)
@@ -79,7 +92,7 @@ clean_geo <- function(df_data,
   
   if (nrow(out_check) > 0) {
     write_pretty_xlsx(out_check,
-                      file = file.path(file.path(path_cleaning, country), sprintf("geocodes_check_%s.xlsx", time_stamp())),
+                      file = file.path(file.path(path_cleaning, country), glue::glue("geocodes_check_{country}_{time_stamp()}.xlsx")),
                       group_shade = "level_ref", zoom = 145)
   }
   
@@ -192,7 +205,3 @@ add_pcode <- function(df_data, df_geo_pcode, adm_match, suffix = "") {
   
   return(df_data)
 }
-
-
-
-

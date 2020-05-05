@@ -83,8 +83,6 @@ clean_linelist_dates <- function(df,
     spread(variable, date)
   
   
-  
-  
   ## join cleaned data columns to main df
   dat_date_clean <- left_join_replace(df,
                                       df_date_parsed_spread,

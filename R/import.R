@@ -18,10 +18,6 @@ import_linelists <- function(path_data_raw,
   ## requires
   library(dplyr)
   source("R/import.R")
-
-  if (FALSE) {
-    country <- "KEN"
-  }
   
   ## scan and parse linelist files to identify the most recent linelist file to
   # import for each facility
@@ -72,10 +68,6 @@ scan_sheets <- function(path_data_raw, country) {
   ## requires
   library(dplyr)
   library(tidyr)
-  
-  if (FALSE) {
-    country <- "NGA"
-  }
   
   path_data_raw_country <- file.path(path_data_raw, country)
   files_country <- list.files(path_data_raw_country, pattern = "^linelist_Covid_")
