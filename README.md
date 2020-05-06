@@ -98,29 +98,55 @@ format-standardized value `non_case` is manually corrected to the valid version
 
 The residence location variable `MSF_admin_location_past_week` represents up to
 four administrative levels separated by " | ". We start by splitting this
-variable into the four composite variables (the original variable is also
-retained):
-
-- `adm1_name__res_raw`
-- `adm2_name__res_raw`
-- `adm3_name__res_raw`
-- `adm4_name__res_raw`
+variable into the four composite variables named `adm*_name__res_raw` (the
+original variable is also retained).
 
 We then attempt to match each set of admin locations to the corresponding set
 within the shapefile for the relevant country using
-[`hmatch::hmatch()`](https://github.com/epicentre-msf/hmatch). This results in 8
-new columns:
+[`hmatch::hmatch()`](https://github.com/epicentre-msf/hmatch). For
+location values that remain unmatched to a dictionary entry, we make a manual
+correction (if possible) as tracked in the dictionaries [TODO].
 
-- `adm1_name__res`
-- `adm2_name__res`
-- `adm3_name__res`
-- `adm4_name__res`
-- `adm1_pcode__res`
-- `adm2_pcode__res`
-- `adm3_pcode__res`
-- `adm4_pcode__res`
+_Example (note we omit the adm4 level here for brevity)_
+```
+  Original variable                 Original values split into separate variables
+  ----------------------------      --------------------------------------------------------
+  MSF_admin_location_past_week      adm1_name__res_raw adm2_name__res_raw adm3_name__res_raw
+1 New York | Eerie | Buffalo        New York           Eerie              Buffalo
+2 Philadelphia | Allegheny | Ville  Philadelphia       Allegheny          Ville
+3 New York | Rochester              New York           Rochester          <NA>              ...
+4 Philadelphia                      Philadelphia       <NA>               <NA>
+5 New Jersey | NJ/Essex             New Jersey         NJ/Essex           <NA>
 
-[TODO: Add further explanation]
+  Shapefile-matched admin names
+  --------------------------------------------
+  adm1_name__res adm2_name__res adm3_name__res
+1 New York       Erie           Buffalo
+2 Philadelphia   Allegheny      <NA>
+3 New York       Rochester      <NA>          ...
+4 Philadelphia   <NA>           <NA>
+5 New Jersey     Essex          <NA>
+
+  Shapefile-matched admin codes
+  -------------------------------------------------------
+  adm1_pcode__res adm2_pcode__res         adm3_pcode__res
+1 new_york        new_york__erie          new_york__erie__buffalo
+2 philadelphia    philadelphia__allegheny <NA>
+3 new_york        new_york__rochester     <NA>
+4 philadelphia    <NA>                    <NA>
+5 new_jersey      new_jersey__essex       <NA>
+```
+In the example above there are 3 mismatches between the linelist and shapefile:
+
+- Line 1: "Eerie" in the linelist is spelled "Erie" in the shapefile. This
+mismatch is close enough (≤2 characters) that fuzzy matching with the function
+`hmatch::hmatch()` will handle it automatically.
+- Line 2: There is no adm3 level "Ville" within the shapefile, and we are unable
+to find a match manually, so the clean variables (`adm*_name__res` and
+`adm*_pcode__res`) will only have non-missing values up to the adm2 level.
+- Line 5: There is no adm2 level "NJ/Essex" in the shapefile, but we determine
+manually that this likely corresponds to "Essex", and add the correction to the
+relevant dictionary.
 
 ## Outputs
 
