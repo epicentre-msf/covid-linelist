@@ -32,10 +32,8 @@ converted to numeric. The value `?` is converted to a missing value (`<NA>`)
 which we cannot correct any further (without input from the field). The value
 `25,` is manually corrected to `25` (after e.g. checking the corresponding value
 of variable `MSF_job` to ensure that the patient is not a child, in which case
-perhaps the age should have been `2.5`).
-
-Based on the example above, the dictionary dict_numeric_correct.xlsx would
-contain the following entry:
+perhaps the age should have been `2.5`), as reflected in the dictionary
+dict_numeric_correct.xlsx:
 ```
           variable   value  replacement
 1 patinfo_ageonset     25,           25
@@ -98,14 +96,14 @@ format-standardized value `non_case` is manually corrected to the valid version
 
 The residence location variable `MSF_admin_location_past_week` represents up to
 four administrative levels separated by " | ". We start by splitting this
-variable into the four composite variables named `adm*_name__res_raw` (the
+variable into the four composite variables, named `adm*_name__res_raw` (the
 original variable is also retained).
 
 We then attempt to match each set of admin locations to the corresponding set
 within the shapefile for the relevant country using
-[`hmatch::hmatch()`](https://github.com/epicentre-msf/hmatch). For
-location values that remain unmatched to a dictionary entry, we make a manual
-correction (if possible) as tracked in the dictionaries [TODO].
+[`hmatch::hmatch()`](https://github.com/epicentre-msf/hmatch). For location
+values that remain unmatched, we make a manual match to the shapefile (if
+possible) as tracked in the dictionaries [TODO].
 
 _Example (note we omit the adm4 level here for brevity)_
 ```
@@ -136,7 +134,7 @@ _Example (note we omit the adm4 level here for brevity)_
 4 philadelphia    <NA>                    <NA>
 5 new_jersey      new_jersey__essex       <NA>
 ```
-In the example above there are 3 mismatches between the linelist and shapefile:
+In the example above there were 3 mismatches between the linelist and shapefile:
 
 - Line 1: "Eerie" in the linelist is spelled "Erie" in the shapefile. This
 mismatch is close enough (≤2 characters) that fuzzy matching with the function
