@@ -90,7 +90,8 @@ update_linelist <- function(path_data_raw,
   df_data_geocleaned <- clean_geo(df_data = df_data_geoclean_prep,
                                   path_cleaning = path_cleaning,
                                   path_shapefiles = path_shapefiles,
-                                  country = country)
+                                  country = country,
+                                  write_checks = write_checks)
   
   
   ## return compiled linelist

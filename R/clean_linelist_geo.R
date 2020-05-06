@@ -10,7 +10,8 @@
 clean_geo <- function(df_data,
                       path_cleaning,
                       path_shapefiles,
-                      country) {
+                      country,
+                      write_checks) {
   
   ## requires
   library(dplyr)
@@ -90,7 +91,7 @@ clean_geo <- function(df_data,
     arrange(level_ref, adm1, adm2, adm3, adm4) %>% 
     mutate(pcode_new = NA_character_, comment = NA_character_)
   
-  if (nrow(out_check) > 0) {
+  if (write_checks & nrow(out_check) > 0) {
     write_pretty_xlsx(out_check,
                       file = file.path(file.path(path_cleaning, country), glue::glue("geocodes_check_{country}_{time_stamp()}.xlsx")),
                       group_shade = "level_ref", zoom = 145)
