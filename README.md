@@ -27,7 +27,7 @@ Original                    To numeric                  Manually corrected
 5              25,          5             <NA>          5               25
 ```
 
-In the example above, original age values `?` and `11,` cannot be automatically
+In the example above, original age values `?` and `25,` cannot be automatically
 converted to numeric. The value `?` is converted to a missing value (`<NA>`)
 which we cannot correct any further (without input from the field). The value
 `25,` is manually corrected to `25` (after e.g. checking the corresponding value
