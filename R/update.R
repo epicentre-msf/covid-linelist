@@ -31,8 +31,8 @@ update_linelist <- function(path_data_raw,
   library(purrr)
   library(glue)
   source("R/import.R")
-  source("R/clean_linelist.R")
-  source("R/clean_linelist_geo.R")
+  source("R/clean.R")
+  source("R/geocode.R")
   
   
   ## when running manually
@@ -58,7 +58,6 @@ update_linelist <- function(path_data_raw,
                                     dict_factors = dict_factors,
                                     dict_factors_correct = dict_factors_correct,
                                     path_cleaning,
-                                    # path_dictionaries,
                                     write_checks = write_checks)
     
     # derived columns

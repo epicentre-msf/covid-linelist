@@ -17,7 +17,7 @@ clean_geo <- function(df_data,
   library(dplyr)
   library(glue)
   library(janitor)
-  source("R/clean_linelist_geo.R")
+  source("R/geocode.R")
   source("R/utilities.R")
   
   
