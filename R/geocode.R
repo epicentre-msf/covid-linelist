@@ -1,13 +1,16 @@
-#' Wrapper for geocleaning/geocoding routines
+#' Implement linelist geocoding routines
 #'
-#' @param df_data 
+#' @param dat Linelist data.frame
 #' @param path_cleaning 
+#' @param path_shapefiles Path to directory with shapefiles
+#' @param country Country ISO code
+#' @param write_checks Logical indicating whether check files should be written
+#'   (defaults to \code{TRUE})
 #'
 #' @return
-#' @export
+#' Linelist with cleaned admin columns appended
 #'
-#' @examples
-clean_geo <- function(df_data,
+clean_geo <- function(dat,
                       path_cleaning,
                       path_shapefiles,
                       country,
@@ -23,17 +26,33 @@ clean_geo <- function(df_data,
   
   ## when running manually
   if (FALSE) {
-    df_data <- df_data_geoclean_prep
+    dat <- dat_clean
   }
   
   
+  ## prep dat for geocoding
+  col_order <- names(dat)
+  adm_cols <- paste0("adm", 1:4, "_name__res")
+  
+  dat_geoclean_prep <- dat %>% 
+    tidyr::separate(MSF_admin_location_past_week,
+                    into = adm_cols,
+                    sep = "[[:space:]]+\\|[[:space:]]+",
+                    fill = "right",
+                    remove = FALSE) %>% 
+    select(all_of(col_order), matches("^adm[[:digit:]]_name"))
+  
+  
   ## load reference DB
-  df_geo_ref <- file.path(path_shapefiles, country, glue("adm_reference_{country}.rds")) %>% 
-    readRDS()
+  df_geo_ref <- readRDS(file.path(path_shapefiles,
+                                  country,
+                                  glue("adm_reference_{country}.rds")))
   
   ## manual corrections
-  file_recode <- file.path(path_cleaning, country) %>% 
-    list_files(pattern = glue::glue("geocodes_recode_{country}"), full.names = TRUE, last.sorted = TRUE)
+  file_recode <- list_files(path_cleaning,
+                            pattern = glue::glue("geocodes_recode_{country}"),
+                            full.names = TRUE,
+                            last.sorted = TRUE)
   
   dict_recode <- if (length(file_recode) == 1) {
     readxl::read_xlsx(file_recode)
@@ -41,8 +60,9 @@ clean_geo <- function(df_data,
     NULL
   }
   
-  df_manual_check_full <- file.path(path_cleaning, country) %>% 
-    list_files(., pattern = glue::glue("geocodes_check_{country}"), full.names = TRUE) %>%
+  df_manual_check_full <- list_files(path_cleaning,
+                                     pattern = glue("geocodes_check_{country}"),
+                                     full.names = TRUE) %>%
     lapply(read_geo_manual) %>%
     dplyr::bind_rows() %>%
     mutate_all(as.character) %>% 
@@ -54,7 +74,7 @@ clean_geo <- function(df_data,
     NULL
   }
   
-  df_geo_raw <- df_data %>% 
+  df_geo_raw <- dat_geoclean_prep %>% 
     select(matches("^adm[1234]_name")) %>% 
     unique() %>%
     setNames(gsub("_name__res", "", names(.)))
@@ -92,8 +112,9 @@ clean_geo <- function(df_data,
     mutate(pcode_new = NA_character_, comment = NA_character_)
   
   if (write_checks & nrow(out_check) > 0) {
+    file_out <- glue("geocodes_check_{country}_{time_stamp()}.xlsx")
     write_pretty_xlsx(out_check,
-                      file = file.path(file.path(path_cleaning, country), glue::glue("geocodes_check_{country}_{time_stamp()}.xlsx")),
+                      file = file.path(path_cleaning, file.out),
                       group_shade = "level_ref", zoom = 145)
   }
   
@@ -122,7 +143,7 @@ clean_geo <- function(df_data,
            ends_with("ref"),
            ends_with("pcode"))
   
-  df_out <- df_data %>% 
+  df_out <- dat_geoclean_prep %>% 
     left_join(df_geo_pcode, by = c("adm1_name__res", "adm2_name__res", "adm3_name__res", "adm4_name__res")) %>% 
     setNames(gsub("__res$", "__res_raw", names(.))) %>% 
     setNames(gsub("__res_ref$", "__res", names(.))) %>% 
@@ -165,44 +186,4 @@ expand_geocode_helper <- function(code, level, split) {
   } else {
     return(paste(code_split[1:level], collapse = split))
   }
-}
-
-
-# TODO: remove adm_match from arguments and automatically find them by looking
-# at admX_nam+suffix in data check that we don't erase existing variables if
-# pcode already present => throw error or warning
-add_pcode <- function(df_data, df_geo_pcode, adm_match, suffix = "") {
-  
-  
-  suffix = paste0("__", c("res"))
-  
-  
-  library(dplyr)
-  library(rlang)
-  
-  var_pcode <- df_geo_pcode %>%
-    select(-ends_with("name$")) %>%
-    names()
-  
-  one_suffix <- suffix
-  for(one_suffix in suffix) {
-    
-    # rename df_geo_pcode
-    names(var_pcode) <- paste0(var_pcode, one_suffix)
-    df_geo_pcode_suffix <- df_geo_pcode %>%
-      rename(!!var_pcode)
-    
-    # rename df_data
-    var_data <- paste0(adm_match, one_suffix)
-    names(var_data) <- paste0(var_data, "_raw")
-    df_data <- df_data %>% rename(!!var_data)
-    
-    by <- paste0(adm_match, "_raw")
-    names(by) <- names(var_data)
-    
-    df_data <- df_data %>%
-      left_join(df_geo_pcode_suffix, by = by)
-  }
-  
-  return(df_data)
 }

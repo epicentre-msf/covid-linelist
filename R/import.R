@@ -1,9 +1,10 @@
 #' Import, standardize, and combine linelists from each facility
 #'
 #' @param path_data_raw Path to directory containing linelists
-#' @param country ISO country code
-#' @param ll_template 
-#' @param dict_facilities 
+#' @param country Country ISO code
+#' @param ll_template Vector of column names in original linelists
+#' @param dict_facilities Dictionary mapping site-ID columns (country, OC,
+#'   project) to site codes
 #'
 #' @return
 #' Combined linelist <tibble> created by binding together the most recent
@@ -36,17 +37,21 @@ import_linelists <- function(path_data_raw,
                    "MSF_N_Patient",
                    "patient_id")
   
+  ## prep dict_facilities for join
+  dict_facilities_join <- dict_facilities %>% 
+    select(site, country, OC, project)
+  
   ## import and prepare
   df_data <- df_sheets %>%
     # TODO: improve this derivation of site via left_join below
-    left_join(dict_facilities, by = c("country", "OC", "project")) %>% 
+    left_join(dict_facilities_join, by = c("country", "OC", "project")) %>% 
     group_by(country, OC, project, site_type, site_name, site, upload_date) %>% 
     do(read_and_prepare_data(file_path = .$file_path)) %>%
     ungroup() %>% 
     mutate(patient_id = paste(site, MSF_N_Patient, sep = "_")) %>% 
     mutate(db_row = 1:n())
   
-  ## columns to add
+  ## columns to add (from original ll template)
   cols_to_add <- setdiff(ll_template, names(df_data))
   df_data[cols_to_add] <- NA_character_
   
@@ -59,7 +64,7 @@ import_linelists <- function(path_data_raw,
 #' Scan and parse linelist filenames to identify files to import
 #'
 #' @param path_data_raw Path to directory containing linelists
-#' @param country ISO country code
+#' @param country Country ISO code
 #'
 #' @return
 #' A tibble with one row per facility, with columns identifying the most

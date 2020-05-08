@@ -1,14 +1,18 @@
 #' Implement linelist cleaning routines
 #'
-#' @param df_data 
-#' @param dict_factors 
+#' @param dat Linelist data.frame
+#' @param path_cleaning 
+#' @param dict_numeric_correct Dictionary of corrections for numeric variables
+#' @param dict_factors Dictionary of allowed values for all factor variables
+#' @param dict_factors_correct Dictionary of corrections for factor variables
 #' @param write_checks 
 #'
 #' @return
 #' Cleaned linelist
 #' 
-clean_linelist <- function(df_data,
+clean_linelist <- function(dat,
                            path_cleaning,
+                           dict_numeric_correct,
                            dict_factors,
                            dict_factors_correct,
                            write_checks) {
@@ -29,17 +33,17 @@ clean_linelist <- function(df_data,
   
   ## if running manually
   if (FALSE) {
-    df_data <- df_data_raw
+    dat <- df_data_raw
     write_checks <- FALSE
   }
   
   
   ## remember original column order
-  col_order <- names(df_data)
+  col_order <- names(dat)
   
   
   #### Clean numeric variables -------------------------------------------------
-  dat_numeric <- df_data %>%
+  dat_numeric <- dat %>%
     select(db_row,
            patient_id,
            patinfo_ageonset,
@@ -50,31 +54,34 @@ clean_linelist <- function(df_data,
     mutate(value = string_to_numeric_prep(value),
            num_value = as.integer(value))
   
+  ## check for non-missing values that could not be converted to numeric
   dat_numeric_check <- dat_numeric %>%
     filter(is.na(num_value), !is.na(value))
   
   if (nrow(dat_numeric_check)) {
-    message("Problem with numeric values:")
+    message("Some values could not be coerced to numeric:")
     dat_numeric_check %>%
-      knitr::kable(caption = "Problem with numeric values") %>%
+      select(-db_row, -num_value) %>% 
+      mutate(replace = NA_character_) %>% 
+      as.data.frame() %>% 
       print()
   }
-
+  
+  ## insert cleaned numeric columns back into df_data
   dat_numeric_merge <- dat_numeric %>%
     select(-value) %>%
     spread(variable, num_value)
   
-  
-  ## insert cleaned numeric columns back into df_data
-  df_data_cleaned_numeric <- left_join_replace(df_data,
-                                               dat_numeric_merge,
-                                               cols_match = c("db_row", "patient_id"))
-  
+  dat_cleaned_numeric <- left_join_replace(
+    dat,
+    dat_numeric_merge,
+    cols_match = c("db_row", "patient_id")
+  )
   
   #### Clean date variables ----------------------------------------------------
   
   ## gather date columns
-  dat_date <- df_data_cleaned_numeric %>%
+  dat_date <- dat_cleaned_numeric %>%
     select(db_row,
            patient_id,
            report_date,
@@ -126,15 +133,15 @@ clean_linelist <- function(df_data,
   
   
   ## spread date columns
-  df_date_parsed_spread <- dat_date_parsed %>%
+  dat_date_parsed_spread <- dat_date_parsed %>%
     select(-value, -id) %>%
     spread(variable, date)
   
   
   ## join cleaned data columns to main df
-  df_dat_cleaned_dates <- left_join_replace(
-    df_data_cleaned_numeric,
-    df_date_parsed_spread,
+  dat_cleaned_dates <- left_join_replace(
+    dat_cleaned_numeric,
+    dat_date_parsed_spread,
     cols_match = c("db_row", "patient_id")
   )
   
@@ -149,14 +156,14 @@ clean_linelist <- function(df_data,
   
   cols_factor <- unique(dict_factors_prep$var)
   
-  df_data_cleaned_factors <- df_dat_cleaned_dates %>% 
+  dat_cleaned_factors <- dat_cleaned_dates %>% 
     mutate_at(cols_factor, hmatch::string_std) %>% 
     linelist::clean_variable_spelling(wordlists = dict_factors_prep) %>% 
     linelist::clean_variable_spelling(wordlists = dict_factors_correct)
   
   
   ## arrange columns
-  df_dat_cleaned <- df_data_cleaned_factors[,col_order]
+  dat_cleaned <- dat_cleaned_factors[,col_order]
   
   
   ## test for valid values
@@ -165,11 +172,9 @@ clean_linelist <- function(df_data,
     do(add_na_dict(.)) %>% 
     ungroup()
   
-  repi::test_if_valid_multi(df_dat_cleaned, dict_valid)
+  repi::test_if_valid_multi(dat_cleaned, dict_valid)
   
   
   ## return
-  return(df_dat_cleaned)
+  return(dat_cleaned)
 }
-
-

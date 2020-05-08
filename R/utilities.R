@@ -37,14 +37,6 @@ max_not_na <- function(x, no_na = 0L, value = FALSE) {
 }
 
 
-
-cap_first <- function(x) {
-  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
-  x
-}
-
-
-
 dist_match <- function(x, y, max_dist = 1) {
   abs(as.numeric(x - y)) <= max_dist | is.na(x) | is.na(y)
 }
@@ -54,23 +46,6 @@ equal_or_na <- function(x, y) {
   x == y | is.na(x) | is.na(y)
 }
 
-
-expand_names <- function(names_x, names_y) {
-  
-  if (length(names_x) != length(names_y)) {
-    stop("Arguments names_x and names_y must be of same length")
-  }
-  
-  mapply(expand_grid_simple,
-         group = seq_along(names_x), x1 = names_x, x2 = names_y,
-         SIMPLIFY = FALSE, USE.NAMES = FALSE)
-}
-
-expand_grid_simple <- function(group, x1, x2) {
-  y1 <- rep(x1, each = length(x2))
-  y2 <- rep(x2, times = length(x1))
-  cbind(group = group, x1 = y1, x2 = y2)
-}
 
 # test whether each row of data.frame is almost-empty, defined in relation
 #  to a critical number of non-<NA> values
@@ -199,33 +174,11 @@ numeric_within_error <- function(x, range_max) {
 }
 
 
-names_within_error <- function(x, dist_range_max) {
-  # takes a vector of proper names and determines whether the stringdist between
-  #  all pairs is less than a given threshold (i.e. whether all the names are all
-  #  similar)
-  library(repi)
-  combinations <- combn(x, 2)
-  similarity_metrics <- apply(
-    combinations, 2, function(x) repi::string_similarity(x[1], x[2])
-  )
-  min_distances <- apply(similarity_metrics, 2, min, na.rm = TRUE)
-  ifelse(all(min_distances <= dist_range_max), TRUE, FALSE)
-}
-
-
 is_excel_numeric <- function(x) {
   # check whether character string is probable excel date
   # i.e. string consisting solely of 4-6 digits
   grepl("^[[:digit:]]{4,6}$", x)
 }
-
-
-is_excel_numeric <- function(x) {
-  # check whether character string is probable excel date
-  # i.e. string consisting solely of 4-6 digits
-  grepl("^[[:digit:]]{4,6}$", x)
-}
-
 
 
 parse_excel_dates <- function(x) {
@@ -244,30 +197,11 @@ as_numeric_quiet <- function(x) {
 }
 
 
-firstup <- function(x) {
-  # fist character in string to capital
-  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
-  x
-}
-
 
 print_and_capture <- function(x) {
   # useful for adding a data.frame to a message() or warning()
   if ("tbl" %in% class(x)) x <- as.data.frame(x)
   paste(utils::capture.output(print(x)), collapse = "\n")
-}
-
-
-format_text <- function(x) {
-  library(stringr)
-  xx <- str_to_lower(x)
-  xx <- str_trim(xx)
-  xx <- str_replace_all(xx, "[^[:alnum:]]+", "_")
-  xx <- str_replace(xx, "[_]+\\b", "")
-  xx <- base::iconv(xx, to = "ASCII//TRANSLIT")
-  xx <- str_replace_all(xx, "[^[[:alnum:]|_]]+", "")
-  xx[xx == ""] <- NA_character_
-  return(xx)
 }
 
 
@@ -318,25 +252,6 @@ write_pretty_xlsx <- function(x, file, fill = "#ffcccb", date_format = "yyyy-mm-
   }
   
   suppressMessages(openxlsx::saveWorkbook(wb, file = file, overwrite = overwrite))
-}
-
-
-
-
-filter_unique_id <- function(dat, col_group, col_id, invert = FALSE) {
-  
-  out <- dat %>% 
-    dplyr::group_by(!!ensym(col_group)) %>% 
-    dplyr::mutate(HAS_UNIQUE_ID = unique_no_na(!!ensym(col_id))) %>% 
-    dplyr::ungroup()
-  
-  if (invert) {
-    out <- filter(out, !HAS_UNIQUE_ID)
-  } else {
-    out <- filter(out, HAS_UNIQUE_ID)
-  }
-  
-  return(dplyr::select(out, -HAS_UNIQUE_ID))
 }
 
 

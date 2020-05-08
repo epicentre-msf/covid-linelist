@@ -1,11 +1,15 @@
 #' Update compiled linelist
 #'
 #' @param path_data_raw Path to directory with raw linelist files
-#' @param dict_facilities 
-#' @param dict_factors 
-#' @param ll_template 
-#' @param country 
-#' @param verbose_import 
+#' @param path_cleaning Path to directory with data cleaning files
+#' @param path_shapefiles Path to directory with shapefiles
+#' @param country Country ISO code
+#' @param dict_facilities Dictionary mapping site-ID columns (country, OC,
+#'   project) to site codes
+#' @param dict_numeric_correct Dictionary of corrections for numeric variables
+#' @param dict_factors Dictionary of allowed values for all factor variables
+#' @param dict_factors_correct Dictionary of corrections for factor variables
+#' @param ll_template Vector of column names in original linelist
 #' @param run_cleaning Logical indicating whether to run linelist cleaning
 #'   function or use last-written cleaned file (defaults to \code{TRUE})
 #' @param write_checks Logical indicating whether check files should be written
@@ -15,20 +19,18 @@
 #' Tibble reflecting the up-to-date cleaned linelists
 #' 
 update_linelist <- function(path_data_raw,
+                            path_cleaning,
                             path_shapefiles,
+                            country,
                             dict_facilities,
+                            dict_numeric_correct,
                             dict_factors,
                             dict_factors_correct,
                             ll_template,
-                            country,
                             run_cleaning = TRUE,
-                            write_checks = TRUE,
-                            verbose_import = TRUE) {
+                            write_checks = TRUE) {
   
   ## requires
-  library(dplyr)
-  library(tidyr)
-  library(purrr)
   library(glue)
   source("R/import.R")
   source("R/clean.R")
@@ -38,9 +40,7 @@ update_linelist <- function(path_data_raw,
   ## when running manually
   if (FALSE) {
     run_cleaning <- TRUE
-    run_duplicates <- TRUE
     write_checks <- FALSE
-    verbose_import <- FALSE
   }
   
   
@@ -48,52 +48,41 @@ update_linelist <- function(path_data_raw,
   if (run_cleaning) {
     
     # import linelists for each site, with some initial cleaning/standaridizing
-    df_data_raw <- import_linelists(path_data_raw = path_data_raw,
-                                    country = country,
-                                    ll_template = ll_template,
-                                    dict_facilities = dict_facilities)
+    dat_raw <- import_linelists(path_data_raw = path_data_raw,
+                                country = country,
+                                ll_template = ll_template,
+                                dict_facilities = dict_facilities)
     
     # full linelist cleaning
-    df_data_clean <- clean_linelist(df_data_raw,
-                                    dict_factors = dict_factors,
-                                    dict_factors_correct = dict_factors_correct,
-                                    path_cleaning,
-                                    write_checks = write_checks)
+    dat_clean <- clean_linelist(dat_raw,
+                                dict_factors = dict_factors,
+                                dict_factors_correct = dict_factors_correct,
+                                path_cleaning,
+                                write_checks = write_checks)
     
-    # derived columns
-    df_data_clean_derived <- df_data_clean %>% 
-      mutate(age_in_years = map2_dbl(patinfo_ageonset, patinfo_ageonsetunit, age_to_years))
+    # derive age_in_years
+    dat_clean$age_in_years <- age_to_years(value = dat_clean$patinfo_ageonset,
+                                           unit = dat_clean$patinfo_ageonsetunit)
     
     # write cleaned linelist to file
-    saveRDS(df_data_clean_derived, glue::glue("local/df_data_cleaned_{country}.rds"))
+    saveRDS(dat_clean, glue::glue("local/ll_covid_cleaned_{country}.rds"))
 
   } else {
     
     # else skip cleaning and use last-written data
-    df_data_clean_derived <- readRDS(glue::glue("local/df_data_cleaned_{country}.rds"))
+    dat_clean <- readRDS(glue::glue("local/ll_covid_cleaned_{country}.rds"))
   }
   
   
-  ## geo-cleaning
-  col_order <- names(df_data_clean_derived)
-  adm_cols <- paste0("adm", 1:4, "_name__res")
-  
-  df_data_geoclean_prep <- df_data_clean_derived %>% 
-    tidyr::separate(MSF_admin_location_past_week,
-                    into = adm_cols,
-                    sep = "[[:space:]]+\\|[[:space:]]+",
-                    fill = "right",
-                    remove = FALSE) %>% 
-    select(all_of(col_order), matches("^adm[[:digit:]]_name"))
-  
-  df_data_geocleaned <- clean_geo(df_data = df_data_geoclean_prep,
-                                  path_cleaning = path_cleaning,
-                                  path_shapefiles = path_shapefiles,
-                                  country = country,
-                                  write_checks = write_checks)
+  ## geocoding
+  dat_geocoded <- clean_geo(dat = dat_clean,
+                            path_cleaning = path_cleaning,
+                            path_shapefiles = path_shapefiles,
+                            country = country,
+                            write_checks = write_checks)
   
   
   ## return compiled linelist
-  return(df_data_geocleaned)
+  return(dat_geocoded)
 }
 
