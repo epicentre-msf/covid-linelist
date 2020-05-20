@@ -15,14 +15,13 @@ path_cleaning <- file.path(path_data_raw, "cleaning")
 path_dictionaries <- file.path(path_cleaning, "dictionaries")
 path_shapefiles <- file.path(path_onedrive, "data/shapefiles")
 path_export <- file.path(path_onedrive, "data/linelist/HIS-export")
+path_export_fp <- file.path(path_onedrive, "coordination/Surveillance focal points coordination/Data compilation")
 path_export_global <- file.path(path_onedrive, "data/linelist/world")
 
 
 ### Read dictionaries
 dict_facilities <- read_xlsx(file.path(path_dictionaries, "dict_facilities.xlsx"))
-dict_numeric_correct <- read_xlsx(file.path(path_dictionaries, "dict_numeric_correct.xlsx"))
 dict_factors <- read_xlsx(file.path(path_dictionaries, "dict_factors.xlsx"))
-dict_factors_correct <- read_xlsx(file.path(path_dictionaries, "dict_factors_correct.xlsx"))
 ll_template <- names(readxl::read_xlsx(file.path(path_dictionaries, "ll_template_v1.1.xlsx")))
 
 
@@ -32,25 +31,28 @@ ll_template <- names(readxl::read_xlsx(file.path(path_dictionaries, "ll_template
 
 source("R/update.R")
 
-# focal country ISO code (AFG, KEN, IRQ, NGA)
-country <- "AFG"
+# focal country ISO code
+countries <- c("AFG", "KEN", "IRQ", "NGA", "CMR", "MEX", "SOM", "COD", "BGD", "GIN", "MLI")
 
-# run update routines
-d_country <- update_linelist(path_data_raw = path_data_raw,
-                             path_shapefiles = path_shapefiles,
-                             path_cleaning = path_cleaning,
-                             country = country,
-                             dict_facilities = dict_facilities,
-                             dict_numeric_correct = dict_numeric_correct,
-                             dict_factors = dict_factors,
-                             dict_factors_correct = dict_factors_correct,
-                             ll_template = ll_template,
-                             run_cleaning = TRUE,
-                             write_checks = FALSE)
+for (country in countries) {
 
-# write country-specific compilation to local folder
-saveRDS(d_country, glue("local/msf_covid19_linelist_{country}.rds"))
-
+  # country <- "MLI"
+  
+  # run update routines
+  d_country <- update_linelist(path_data_raw = path_data_raw,
+                               path_shapefiles = path_shapefiles,
+                               path_cleaning = path_cleaning,
+                               path_dictionaries = path_dictionaries,
+                               country = country,
+                               dict_facilities = dict_facilities,
+                               dict_factors = dict_factors,
+                               ll_template = ll_template,
+                               run_cleaning = TRUE,
+                               write_checks = TRUE)
+  
+  # write country-specific compilation to local folder
+  saveRDS(d_country, glue("local/msf_covid19_linelist_{country}.rds"))
+}
 
 
 ### Compile global linelist
@@ -71,7 +73,13 @@ oc_list <- unique(d_global$OC)
 for (oc_focal in oc_list) {
   d_oc <- filter(d_global, OC == oc_focal)
   file_out_oc <- glue("msf_covid19_linelist_{tolower(oc_focal)}_{lubridate::today()}.xlsx")
-  path_out_oc <- file.path(path_export, oc_focal, file_out_oc)
-  write_pretty_xlsx(d_oc, path_out_oc)
+  
+  # HIS-export
+  path_out1_oc <- file.path(path_export, oc_focal, file_out_oc)
+  write_pretty_xlsx(d_oc, path_out1_oc)
+  
+  # focal point
+  path_out2_oc <- file.path(path_export_fp, oc_focal, file_out_oc)
+  write_pretty_xlsx(d_oc, path_out2_oc)
 }
 

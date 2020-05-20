@@ -1,48 +1,57 @@
 #' Implement linelist cleaning routines
 #'
 #' @param dat Linelist data.frame
-#' @param path_cleaning 
-#' @param dict_numeric_correct Dictionary of corrections for numeric variables
+#' @param path_cleaning Path to directory with data cleaning files
+#' @param path_dictionaries Path to directory with recoding dictionaries
 #' @param dict_factors Dictionary of allowed values for all factor variables
-#' @param dict_factors_correct Dictionary of corrections for factor variables
-#' @param write_checks 
+#' @param write_checks Logical indicating whether check files should be written
+#'   (defaults to \code{TRUE})
 #'
 #' @return
 #' Cleaned linelist
 #' 
 clean_linelist <- function(dat,
                            path_cleaning,
-                           dict_numeric_correct,
+                           path_dictionaries,
                            dict_factors,
-                           dict_factors_correct,
                            write_checks) {
 
   ## requires
   library(dplyr)
-  library(purrr)
   library(tidyr)
-  library(stringr)
-  library(lubridate)
-  library(readxl)
-  library(fs)
-  library(forcats)
-  library(repi)
-  source("R/clean.R")
+  library(glue)
+  library(matchmaker)
   source("R/utilities.R")
 
-  
   ## if running manually
   if (FALSE) {
-    dat <- df_data_raw
+    dat <- dat_raw
     write_checks <- FALSE
   }
   
+  ## linelist language
+  lang <- switch(country,
+                 "CMR" = "fr",
+                 "COD" = "fr",
+                 "GIN" = "fr",
+                 "MLI" = "fr",
+                 "MEX" = "es",
+                 "en")
   
-  ## remember original column order
-  col_order <- names(dat)
+  ## read recoding dictionaries
+  dict_numeric_correct <- read_xlsx(file.path(path_dictionaries, "dict_numeric_correct.xlsx"))
+  dict_factors_correct <- read_xlsx(file.path(path_dictionaries, glue("dict_factors_correct_{lang}.xlsx")))
   
   
   #### Clean numeric variables -------------------------------------------------
+  
+  ## prepare dictionary
+  dict_numeric_prep <- dict_numeric_correct %>% 
+    mutate_at(vars(patient_id, variable, value), as.character) %>% 
+    mutate_at(vars(replacement), as.integer) %>% 
+    filter(!is.na(replacement))
+  
+  ## gather numeric variables, convert to numeric, and apply dictionary
   dat_numeric <- dat %>%
     select(db_row,
            patient_id,
@@ -50,38 +59,35 @@ clean_linelist <- function(dat,
            MSF_delay_before_admission,
            MSF_length_stay,
            outcome_contacts_followed) %>% 
-    gather(variable, value, -db_row, -patient_id) %>%
-    mutate(value = string_to_numeric_prep(value),
-           num_value = as.integer(value))
+    tidyr::gather(variable, value, -db_row, -patient_id) %>%
+    mutate(value_numeric = suppressWarnings(as.integer(value))) %>% 
+    left_join(dict_numeric_prep, by = c("patient_id", "variable", "value")) %>% 
+    mutate(replace = !is.na(replacement) & is.na(value_numeric)) %>% 
+    mutate(value_numeric = ifelse(replace, replacement, value_numeric)) %>% 
+    select(-replacement) %>% 
+    mutate(flag = !is.na(value) & is.na(value_numeric))
   
-  ## check for non-missing values that could not be converted to numeric
-  dat_numeric_check <- dat_numeric %>%
-    filter(is.na(num_value), !is.na(value))
-  
-  if (nrow(dat_numeric_check)) {
-    message("Some values could not be coerced to numeric:")
-    dat_numeric_check %>%
-      select(-db_row, -num_value) %>% 
+  ## check for non-missing values not converted to numeric
+  if (any(dat_numeric$flag)) {
+    message("Values of numeric variables could not be coerced to numeric:")
+    dat_numeric %>%
+      filter(flag) %>% 
+      select(patient_id, variable, value) %>% 
       mutate(replace = NA_character_) %>% 
-      as.data.frame() %>% 
       print()
   }
   
-  ## insert cleaned numeric columns back into df_data
-  dat_numeric_merge <- dat_numeric %>%
-    select(-value) %>%
-    spread(variable, num_value)
+  ## merge cleaned numeric columns back into dat_numeric
+  dat_numeric_clean <- dat_numeric %>%
+    select(-value, -replace, -flag) %>%
+    tidyr::spread(variable, value_numeric) %>% 
+    left_join_replace(x = dat, y = ., cols_match = c("db_row", "patient_id"))
   
-  dat_cleaned_numeric <- left_join_replace(
-    dat,
-    dat_numeric_merge,
-    cols_match = c("db_row", "patient_id")
-  )
   
   #### Clean date variables ----------------------------------------------------
   
   ## gather date columns
-  dat_date <- dat_cleaned_numeric %>%
+  dat_date <- dat_numeric_clean %>%
     select(db_row,
            patient_id,
            report_date,
@@ -97,84 +103,80 @@ clean_linelist <- function(dat,
            outcome_patcourse_presHCF,
            outcome_date_of_outcome,
            outcome_lab_date) %>%
-    gather(variable, value, -db_row, -patient_id) %>%
-    mutate(id = 1:n()) %>% 
-    arrange(db_row, patient_id, id)
-  
-  
-  ## parse numeric values to date (anything that can't be parsed converted to <NA>)
-  dat_date_numeric <- dat_date %>%
+    tidyr::gather(variable, value, -db_row, -patient_id) %>%
+    arrange(db_row, patient_id) %>% 
     mutate(date = as.Date(value)) %>%
-    filter(is.na(value) | !is.na(date))
+    mutate(flag = !is.na(value) & is.na(date))
   
   
-  ## try parsing values converted to <NA> above
-  dat_date_text <- dat_date %>%
-    anti_join(dat_date_numeric, "id") %>%
-    mutate(date = parse_date_time(value, orders = c("dby", "bdy"), quiet = TRUE),
-           date = as.Date(date),
-           date = if_else(is.na(date) & str_detect(value, "\\d+/\\d+/\\d+"), value %>% mdy(quiet = TRUE) %>% as.Date(), date)
-    )
-  
-  
-  if (nrow(dat_date_text) > 0) {
-    message("Check date values that could not initially be parsed")
-    print(dat_date_text, n = "all")
+  ## check for non-missing values not converted to date
+  if (any(dat_date$flag)) {
+    
+    dat_date_flag <- dat_date %>% 
+      filter(flag) %>% 
+      select(db_row) %>%
+      unique() %>% 
+      left_join(dat_date, by = "db_row") %>% 
+      mutate(flag = ifelse(!flag, NA, flag)) %>% 
+      filter(!is.na(value)) %>% 
+      group_by(db_row) %>% 
+      arrange(date) %>% 
+      ungroup() %>% 
+      mutate(date_correct = NA_character_, comment = NA_character_) %>% 
+      select(patient_id, variable, value, date, date_correct, flag, comment)
+      
+    file_out <- glue("dates_check_{country}_{time_stamp()}.xlsx")
+    
+    write_pretty_xlsx(dat_date_flag,
+                      file = file.path(path_cleaning, file_out),
+                      group_shade = "patient_id")
   }
   
+  ## merge cleaned date columns back into dat
+  dat_dates_clean <- dat_date %>%
+    select(-value, -flag) %>%
+    tidyr::spread(variable, date) %>% 
+    left_join_replace(x = dat_numeric_clean, y = ., cols_match = c("db_row", "patient_id"))
   
-  ## combine
-  dat_date_parsed <- bind_rows(dat_date_numeric, dat_date_text)
-  
-  
-  # ## recode based on all dictionaries
-  # dat_parsed_recoded <- dat_date_parsed %>%  
-  #   repi::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE)
-  
-  
-  ## spread date columns
-  dat_date_parsed_spread <- dat_date_parsed %>%
-    select(-value, -id) %>%
-    spread(variable, date)
+  ## possible additional date checks to implement
+  # all date variables <= today
+  # all date variables >= 2020-02-01
+  # report_date > patcourse_dateonset
+  # outcome_onset_symptom >= patcourse_dateonset
   
   
-  ## join cleaned data columns to main df
-  dat_cleaned_dates <- left_join_replace(
-    dat_cleaned_numeric,
-    dat_date_parsed_spread,
-    cols_match = c("db_row", "patient_id")
-  )
+  #### Clean categorical variables ---------------------------------------------
   
-  
-  #### Clean factor variables --------------------------------------------------
-  
-  ## recode variables using linelist::clean_variable_spelling()
-  dict_factors_prep <- dict_factors %>% 
-    select(var = variable_en, val = values_en) %>% 
+  ## recode variables using matchmaker::match_df()
+  dict_factors_prep <- dict_factors[,c("variable",
+                                       paste("values", lang, sep = "_"),
+                                       "values_en")] %>% 
+    setNames(c("var", "val", "val_en")) %>% 
     mutate(val_clean = hmatch::string_std(val)) %>% 
-    select(val_clean, val, var)
+    select(val_clean, val, var, val_en)
   
-  cols_factor <- unique(dict_factors_prep$var)
+  dat_factors_clean <- dat_dates_clean %>% 
+    mutate_at(unique(dict_factors$variable), hmatch::string_std) %>% 
+    matchmaker::match_df(dictionary = dict_factors_prep) %>% 
+    matchmaker::match_df(dictionary = dict_factors_correct)
   
-  dat_cleaned_factors <- dat_cleaned_dates %>% 
-    mutate_at(cols_factor, hmatch::string_std) %>% 
-    linelist::clean_variable_spelling(wordlists = dict_factors_prep) %>% 
-    linelist::clean_variable_spelling(wordlists = dict_factors_correct)
+  ## test for nonvalid values
+  nonvalid <- matchmaker::check_df(dat_factors_clean,
+                                   dict_factors_prep,
+                                   col_vals = 2,
+                                   col_vars = 3,
+                                   always_allow_na = TRUE,
+                                   return_allowed = TRUE)
   
+  if (nrow(nonvalid) > 0) {
+    message("Some categorical variables contain nonvalid values:")
+    print(nonvalid)
+  }
   
-  ## arrange columns
-  dat_cleaned <- dat_cleaned_factors[,col_order]
-  
-  
-  ## test for valid values
-  dict_valid <- dict_factors[,2:1] %>% 
-    group_by(variable_en) %>% 
-    do(add_na_dict(.)) %>% 
-    ungroup()
-  
-  repi::test_if_valid_multi(dat_cleaned, dict_valid)
-  
+  ## translate to english
+  dat_factors <- dat_factors_clean %>% 
+    matchmaker::match_df(dictionary = dict_factors_prep, from = "val", to = "val_en")
   
   ## return
-  return(dat_cleaned)
+  return(dat_factors)
 }

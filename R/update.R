@@ -1,4 +1,4 @@
-#' Update compiled linelist
+#' Update compiled linelist (wrapper for import, clean, and geocode routines)
 #'
 #' @param path_data_raw Path to directory with raw linelist files
 #' @param path_cleaning Path to directory with data cleaning files
@@ -16,16 +16,15 @@
 #'   (defaults to \code{TRUE})
 #'
 #' @return
-#' Tibble reflecting the up-to-date cleaned linelists
+#' Compiled, cleaned, geocoded linelist for given country
 #' 
 update_linelist <- function(path_data_raw,
                             path_cleaning,
+                            path_dictionaries,
                             path_shapefiles,
                             country,
                             dict_facilities,
-                            dict_numeric_correct,
                             dict_factors,
-                            dict_factors_correct,
                             ll_template,
                             run_cleaning = TRUE,
                             write_checks = TRUE) {
@@ -55,9 +54,9 @@ update_linelist <- function(path_data_raw,
     
     # full linelist cleaning
     dat_clean <- clean_linelist(dat_raw,
-                                dict_factors = dict_factors,
-                                dict_factors_correct = dict_factors_correct,
                                 path_cleaning,
+                                path_dictionaries,
+                                dict_factors = dict_factors,
                                 write_checks = write_checks)
     
     # derive age_in_years

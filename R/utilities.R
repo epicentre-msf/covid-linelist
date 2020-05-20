@@ -128,12 +128,15 @@ left_join_verbose <- function(x, y, by = NULL, copy = FALSE,
 left_join_replace <- function(x, y, cols_match) {
   # add columns in y to x, by = cols_match, overwriting any common columns
   library(dplyr)
+  
+  cols_orig_x <- names(x)
   cols_replace <- setdiff(names(y), cols_match)
   cols_keep <- setdiff(names(x), cols_replace)
   
   x %>%
     dplyr::select(!!!cols_keep) %>% 
-    dplyr::left_join(y, by = cols_match)
+    dplyr::left_join(y, by = cols_match) %>% 
+    select(all_of(cols_orig_x))
 }
 
 

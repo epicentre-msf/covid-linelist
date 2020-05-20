@@ -18,11 +18,15 @@ import_linelists <- function(path_data_raw,
   
   ## requires
   library(dplyr)
+  library(hmatch)
   source("R/import.R")
   
   ## scan and parse linelist files to identify the most recent linelist file to
   # import for each facility
-  df_sheets <- scan_sheets(path_data_raw, country)
+  df_sheets <- scan_sheets(path_data_raw, country) %>% 
+    mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
+    mutate(site_name_join = hmatch::string_std(site_name)) %>% 
+    select(-site_name)
   
   ## derived columns
   cols_derive <- c("db_row",
@@ -39,12 +43,13 @@ import_linelists <- function(path_data_raw,
   
   ## prep dict_facilities for join
   dict_facilities_join <- dict_facilities %>% 
-    select(site, country, OC, project)
+    mutate(site_name_join = hmatch::string_std(site_filename)) %>% 
+    select(site, country, OC, project, site_name, site_name_join)
   
   ## import and prepare
   df_data <- df_sheets %>%
     # TODO: improve this derivation of site via left_join below
-    left_join(dict_facilities_join, by = c("country", "OC", "project")) %>% 
+    left_join(dict_facilities_join, by = c("country", "OC", "project", "site_name_join")) %>% 
     group_by(country, OC, project, site_type, site_name, site, upload_date) %>% 
     do(read_and_prepare_data(file_path = .$file_path)) %>%
     ungroup() %>% 
@@ -97,8 +102,9 @@ scan_sheets <- function(path_data_raw, country) {
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{1,3}") %>% 
-    group_by(country, OC, project) %>%
-    filter(upload_date == max(upload_date, na.rm = TRUE)) %>% 
+    group_by(country, OC, project, site_name) %>%
+    arrange(desc(upload_date)) %>% 
+    slice(1) %>% 
     filter(file_path == max(file_path)) %>%  # avoid multi-export duplicates
     ungroup() %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))
