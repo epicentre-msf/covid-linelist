@@ -102,12 +102,14 @@ clean_linelist <- function(dat,
            outcome_submitted_date,
            outcome_patcourse_presHCF,
            outcome_date_of_outcome,
-           outcome_lab_date) %>%
+           outcome_lab_date,
+           MSF_date_treament1,
+           MSF_date_treament2,
+           MSF_date_treament3) %>%
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     arrange(db_row, patient_id) %>% 
     mutate(date = as.Date(value)) %>%
     mutate(flag = !is.na(value) & is.na(date))
-  
   
   ## check for non-missing values not converted to date
   if (any(dat_date$flag)) {
@@ -130,6 +132,9 @@ clean_linelist <- function(dat,
     write_pretty_xlsx(dat_date_flag,
                       file = file.path(path_cleaning, file_out),
                       group_shade = "patient_id")
+    
+    nambig <- sum(dat_date_flag$flag, na.rm = TRUE)
+    message(paste(nambig, "ambiguous dates written to file"))
   }
   
   ## merge cleaned date columns back into dat

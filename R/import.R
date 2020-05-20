@@ -23,11 +23,8 @@ import_linelists <- function(path_data_raw,
   
   ## scan and parse linelist files to identify the most recent linelist file to
   # import for each facility
-  df_sheets <- scan_sheets(path_data_raw, country) %>% 
-    mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
-    mutate(site_name_join = hmatch::string_std(site_name)) %>% 
-    select(-site_name)
-  
+  df_sheets <- scan_sheets(path_data_raw, country, dict_facilities)
+
   ## derived columns
   cols_derive <- c("db_row",
                    "linelist_row",
@@ -38,23 +35,18 @@ import_linelists <- function(path_data_raw,
                    "site_type",
                    "site_name",
                    "site",
+                   "uid",
                    "MSF_N_Patient",
                    "patient_id")
-  
-  ## prep dict_facilities for join
-  dict_facilities_join <- dict_facilities %>% 
-    mutate(site_name_join = hmatch::string_std(site_filename)) %>% 
-    select(site, country, OC, project, site_name, site_name_join)
-  
+
   ## import and prepare
   df_data <- df_sheets %>%
-    # TODO: improve this derivation of site via left_join below
-    left_join(dict_facilities_join, by = c("country", "OC", "project", "site_name_join")) %>% 
-    group_by(country, OC, project, site_type, site_name, site, upload_date) %>% 
+    group_by(country, OC, project, site_type, site_name, site, uid, upload_date) %>% 
     do(read_and_prepare_data(file_path = .$file_path)) %>%
     ungroup() %>% 
-    mutate(patient_id = paste(site, MSF_N_Patient, sep = "_")) %>% 
+    mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
+  
   
   ## columns to add (from original ll template)
   cols_to_add <- setdiff(ll_template, names(df_data))
@@ -75,7 +67,7 @@ import_linelists <- function(path_data_raw,
 #' A tibble with one row per facility, with columns identifying the most
 #' recent linelist file to import, including file_path, upload_date, etc.
 #' 
-scan_sheets <- function(path_data_raw, country) {
+scan_sheets <- function(path_data_raw, country, dict_facilities) {
 
   ## requires
   library(dplyr)
@@ -98,14 +90,25 @@ scan_sheets <- function(path_data_raw, country) {
                   "site_latitude",
                   "upload_date")
   
+  ## prep dict_facilities for join
+  dict_facilities_join <- dict_facilities %>% 
+    mutate_all(as.character) %>% 
+    mutate(site_name_join = hmatch::string_std(site_filename)) %>% 
+    select(site, country, OC, project, site_name, uid,  site_name_join)
+  
+  
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{1,3}") %>% 
-    group_by(country, OC, project, site_name) %>%
+    mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
+    mutate(site_name_join = hmatch::string_std(site_name)) %>% 
+    select(-site_name, -project) %>% 
+    left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
+    select(-site_name_join) %>% 
+    group_by(site) %>%
     arrange(desc(upload_date)) %>% 
-    slice(1) %>% 
-    filter(file_path == max(file_path)) %>%  # avoid multi-export duplicates
+    slice(1) %>%
     ungroup() %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))
  

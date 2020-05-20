@@ -36,7 +36,7 @@ countries <- c("AFG", "KEN", "IRQ", "NGA", "CMR", "MEX", "SOM", "COD", "BGD", "G
 
 for (country in countries) {
 
-  # country <- "MLI"
+  # country <- "GIN"
   
   # run update routines
   d_country <- update_linelist(path_data_raw = path_data_raw,
@@ -49,6 +49,8 @@ for (country in countries) {
                                ll_template = ll_template,
                                run_cleaning = TRUE,
                                write_checks = TRUE)
+  
+  any(is.na(d_country$site))
   
   # write country-specific compilation to local folder
   saveRDS(d_country, glue("local/msf_covid19_linelist_{country}.rds"))
@@ -70,16 +72,22 @@ saveRDS(d_global, paste0(path_out_global, ".rds"))
 ### Write OC-specific files
 oc_list <- unique(d_global$OC)
 
+# add upload_date to date_format
+d_global_prep <- d_global %>% 
+  mutate_if(is_date, date_format)
+
+
 for (oc_focal in oc_list) {
-  d_oc <- filter(d_global, OC == oc_focal)
-  file_out_oc <- glue("msf_covid19_linelist_{tolower(oc_focal)}_{lubridate::today()}.xlsx")
   
-  # HIS-export
-  path_out1_oc <- file.path(path_export, oc_focal, file_out_oc)
-  write_pretty_xlsx(d_oc, path_out1_oc)
+  file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(oc_focal)}_{lubridate::today()}.xlsx")
+  
+  # # HIS-export
+  # d_oc_his <- filter(d_global_prep, OC == oc_focal)
+  # path_out1_oc <- file.path(path_export, oc_focal, file_out_oc)
+  # write_pretty_xlsx(d_oc_his, path_out1_oc)
   
   # focal point
+  d_oc_foc <- filter(d_global, OC == oc_focal)
   path_out2_oc <- file.path(path_export_fp, oc_focal, file_out_oc)
-  write_pretty_xlsx(d_oc, path_out2_oc)
+  write_pretty_xlsx(d_oc_foc, path_out2_oc)
 }
-

@@ -1,5 +1,31 @@
 
 
+
+is_date <- function(x) {
+  class(x) == "Date"
+}
+
+date_format <- function(x) {
+  xx <- as.character(x)
+  xx[is.na(xx)] <- "NA"
+  return(xx)
+}
+
+
+
+format_text <- function(x) {
+  library(stringr)
+  xx <- toupper(x)
+  xx <- str_trim(xx)
+  # xx <- str_replace_all(xx, "[^[:alnum:]]+", "_")
+  # xx <- str_replace(xx, "[_]+\\b", "")
+  xx <- base::iconv(xx, to = "ASCII//TRANSLIT")
+  xx <- str_replace_all(xx, "[^[[:alnum:]|_]]+", "")
+  xx[xx == ""] <- NA_character_
+  return(xx)
+}
+
+
 add_na_dict <- function(d) {
   dplyr::bind_rows(
     d,
