@@ -14,7 +14,8 @@
 import_linelists <- function(path_data_raw,
                              country,
                              ll_template,
-                             dict_facilities) {
+                             dict_facilities,
+                             dict_extra_vars) {
   
   ## requires
   library(dplyr)
@@ -30,6 +31,7 @@ import_linelists <- function(path_data_raw,
                    "linelist_row",
                    "upload_date",
                    "country",
+                   "shape",
                    "OC",
                    "project",
                    "site_type",
@@ -41,19 +43,27 @@ import_linelists <- function(path_data_raw,
 
   ## import and prepare
   df_data <- df_sheets %>%
-    group_by(country, OC, project, site_type, site_name, site, uid, upload_date) %>% 
-    do(read_and_prepare_data(file_path = .$file_path)) %>%
+    group_by(country, shape, OC, project, site_type, site_name, site, uid, upload_date) %>% 
+    do(read_and_prepare_data(file_path = .$file_path, dict_extra_vars = dict_extra_vars)) %>%
     ungroup() %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
-  
   
   ## columns to add (from original ll template)
   cols_to_add <- setdiff(ll_template, names(df_data))
   df_data[cols_to_add] <- NA_character_
   
+  # check for new columns to be manually renamed
+  extra_cols <- grep("^extra__", names(df_data), value = TRUE)
+  new_cols <- setdiff(names(df_data), c(cols_derive, ll_template, extra_cols))
+  
+  # arrange cols
+  if (length(new_cols) > 0) {
+    message("New linelist columns to rename:\n", paste(new_cols, collapse = "\n"))
+  }
+  
   ## return
-  dplyr::select(df_data, all_of(cols_derive), all_of(ll_template))
+  dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
 }
 
 
@@ -72,10 +82,12 @@ scan_sheets <- function(path_data_raw, country, dict_facilities) {
   ## requires
   library(dplyr)
   library(tidyr)
+  library(glue)
   
   # paths to linelist files for given country
   path_data_raw_country <- file.path(path_data_raw, country)
-  files_country <- list.files(path_data_raw_country, pattern = "^linelist_Covid_")
+  files_country <- list.files(path_data_raw_country,
+                              pattern = glue::glue("^linelist_Covid_anonymous__{country}"))
 
   # regex patterns to remove from file path prior to parsing
   reg_rm <- "^linelist_Covid_anonymous__|_[[:digit:]]{2}-[[:digit:]]{2}\\.xlsb"
@@ -94,13 +106,13 @@ scan_sheets <- function(path_data_raw, country, dict_facilities) {
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
     mutate(site_name_join = hmatch::string_std(site_filename)) %>% 
-    select(site, country, OC, project, site_name, uid,  site_name_join)
-  
+    select(site, country, shape, OC, project, site_name, uid,  site_name_join)
   
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
-    tidyr::separate(path_parse, vars_parse, sep = "_{1,3}") %>% 
+    mutate(path_parse = gsub("lon_|lat_", "", path_parse)) %>%
+    tidyr::separate(path_parse, vars_parse, sep = "_{2}") %>% 
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
     mutate(site_name_join = hmatch::string_std(site_name)) %>% 
     select(-site_name, -project) %>% 
@@ -111,7 +123,7 @@ scan_sheets <- function(path_data_raw, country, dict_facilities) {
     slice(1) %>%
     ungroup() %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))
- 
+  
   ## return
   df_sheet
 }
@@ -126,7 +138,8 @@ scan_sheets <- function(path_data_raw, country, dict_facilities) {
 #' Linelist <tibble> for a single facility, after minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #'
-read_and_prepare_data <- function(file_path) {
+read_and_prepare_data <- function(file_path,
+                                  dict_extra_vars) {
 
   ## requires
   library(dplyr)
@@ -135,20 +148,44 @@ read_and_prepare_data <- function(file_path) {
   
   ## read linelist from relevant excel sheet
   df <- readxlsb::read_xlsb(file_path,
-                            sheet = 1,
+                            sheet = "linelist",
                             col_types = "string")
-
-  ## check for column names beginning with ".." (missing name in excel file)
-  if (any(stringr::str_detect(names(df), "^\\.\\."))) {
-    stop("Missing column names in file: ", file_path)
+  
+  if (nrow(df) > 0) {
+    ## check for column names beginning with ".." (missing name in excel file)
+    if (any(stringr::str_detect(names(df), "^\\.\\."))) {
+      stop("Missing column names in file: ", file_path)
+    }
+    
+    ## remove empty rows/cols, recode column names, and add linelist row number
+    out <- df %>% 
+      dplyr::as_tibble() %>% 
+      mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
+      janitor::remove_empty(which = c("rows")) %>%
+      dplyr::rename_with(., .fn = recode_columns, dict_extra_vars = dict_extra_vars) %>%
+      mutate(linelist_row = seq_len(n())) %>% 
+      select(linelist_row, everything())
+    
+  } else {
+    out <- tibble(linelist_row = integer(0))
   }
 
-  ## remove empty rows/cols, recode column names, and add linelist row number
-  df %>% 
-    dplyr::as_tibble() %>% 
-    mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
-    janitor::remove_empty(which = c("rows")) %>%
-    mutate(linelist_row = 1:n()) %>% 
-    select(linelist_row, everything())
+  out
+}
+
+
+
+recode_columns <- function(x, dict_extra_vars) {
+  
+  # standardize extra names dict
+  dict_extra_vars_prep <- dict_extra_vars %>% 
+    mutate(match = hmatch::string_std(name_raw))  
+  
+  out <- data.frame(orig = x) %>% 
+    mutate(match = hmatch::string_std(orig)) %>% 
+    left_join(dict_extra_vars_prep, by = "match") %>% 
+    mutate(orig = ifelse(!is.na(name), name, orig))
+  
+  return(out$orig)
 }
 

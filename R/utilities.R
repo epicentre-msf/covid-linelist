@@ -1,5 +1,41 @@
 
 
+test_duplicated <- function(x, name) {
+  dups <- duplicated(x)
+  if (any(dups)) {
+    warning(sprintf("The following values of %s are duplicated: ", name),
+            concat_out(x[dups]), call. = FALSE)
+  }
+}
+
+
+concat_out <- function(x) {
+  paste0("c(", paste(dQuote(x, q = FALSE), collapse = ", "), ")")
+}
+
+
+
+check_files_to_dict <- function(path) {
+  
+  library(readxl)
+  library(dplyr)
+  
+  out <- read_xlsx(path, col_types = "text") %>% 
+    filter(!is.na(value), !is.na(date_correct)) %>%
+    mutate(date = as.character(date_correct),   # overwrite date with date_corrected
+           date = ifelse(date == ".na", NA_character_, date),
+           date = vapply(date, parse_excel_dates, ""),
+           date = as.Date(date)) %>%
+    dplyr::select(patient_id, variable, value, date)
+  
+  return(out)
+}
+
+
+fetch_georef <- function(iso, path = path_shapefiles) {
+  readRDS(file.path(path_shapefiles, iso, glue::glue("adm_reference_{iso}.rds")))
+}
+
 
 is_date <- function(x) {
   class(x) == "Date"
@@ -20,7 +56,7 @@ format_text <- function(x) {
   # xx <- str_replace_all(xx, "[^[:alnum:]]+", "_")
   # xx <- str_replace(xx, "[_]+\\b", "")
   xx <- base::iconv(xx, to = "ASCII//TRANSLIT")
-  xx <- str_replace_all(xx, "[^[[:alnum:]|_]]+", "")
+  xx <- str_replace_all(xx, "[^[[:alnum:]]]+", "")
   xx[xx == ""] <- NA_character_
   return(xx)
 }
@@ -237,9 +273,9 @@ print_and_capture <- function(x) {
 ## convert age to years
 age_to_years_scalar <- function(value, unit) {
   switch(tolower(unit),
-         "Year" = value,
-         "Month" = value / 12,
-         "Day" = value / 365.25,
+         "year" = value,
+         "month" = value / 12,
+         "day" = value / 365.25,
          value)
 }
 

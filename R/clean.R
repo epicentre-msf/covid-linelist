@@ -20,6 +20,7 @@ clean_linelist <- function(dat,
   library(dplyr)
   library(tidyr)
   library(glue)
+  library(repi)
   library(matchmaker)
   source("R/utilities.R")
 
@@ -35,7 +36,11 @@ clean_linelist <- function(dat,
                  "COD" = "fr",
                  "GIN" = "fr",
                  "MLI" = "fr",
+                 "NER" = "fr",
+                 "HTI" = "fr",
+                 "CAF" = "fr",
                  "MEX" = "es",
+                 "VEN" = "es",
                  "en")
   
   ## read recoding dictionaries
@@ -49,7 +54,8 @@ clean_linelist <- function(dat,
   dict_numeric_prep <- dict_numeric_correct %>% 
     mutate_at(vars(patient_id, variable, value), as.character) %>% 
     mutate_at(vars(replacement), as.integer) %>% 
-    filter(!is.na(replacement))
+    mutate(replace = TRUE)
+    
   
   ## gather numeric variables, convert to numeric, and apply dictionary
   dat_numeric <- dat %>%
@@ -58,14 +64,15 @@ clean_linelist <- function(dat,
            patinfo_ageonset,
            MSF_delay_before_admission,
            MSF_length_stay,
+           Comcond_present,
            outcome_contacts_followed) %>% 
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     mutate(value_numeric = suppressWarnings(as.integer(value))) %>% 
     left_join(dict_numeric_prep, by = c("patient_id", "variable", "value")) %>% 
-    mutate(replace = !is.na(replacement) & is.na(value_numeric)) %>% 
+    mutate(replace = ifelse(is.na(replace), FALSE, replace)) %>% 
     mutate(value_numeric = ifelse(replace, replacement, value_numeric)) %>% 
     select(-replacement) %>% 
-    mutate(flag = !is.na(value) & is.na(value_numeric))
+    mutate(flag = !is.na(value) & is.na(value_numeric) & !replace)
   
   ## check for non-missing values not converted to numeric
   if (any(dat_numeric$flag)) {
@@ -86,10 +93,22 @@ clean_linelist <- function(dat,
   
   #### Clean date variables ----------------------------------------------------
   
+  ## assemble dictionary for date variables
+  check_files <- list_files(
+    path_cleaning,
+    pattern = glue::glue("dates_check_{country}_.*\\.xlsx"),
+    full.names = TRUE
+  )
+  
+  dict_dates <- dplyr::bind_rows(lapply(check_files, check_files_to_dict))
+  if (nrow(dict_dates) == 0) dict_dates <- NULL
+  
+  
   ## gather date columns
   dat_date <- dat_numeric_clean %>%
     select(db_row,
            patient_id,
+           upload_date,
            report_date,
            Lab_date1,
            patcourse_dateonset,
@@ -108,46 +127,91 @@ clean_linelist <- function(dat,
            MSF_date_treament3) %>%
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     arrange(db_row, patient_id) %>% 
-    mutate(date = as.Date(value)) %>%
-    mutate(flag = !is.na(value) & is.na(date))
+    mutate(date = as.Date(value))
   
+  if (!is.null(dict_dates)) {
+    dat_date <- dat_date %>% 
+      repi::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE)
+  } else {
+    dat_date <- dat_date %>% 
+      mutate(date_is_recoded = FALSE)
+  }
+  
+  dat_date <- dat_date %>% 
+    mutate(flag_ambiguous = ifelse(!date_is_recoded & !is.na(value) & is.na(date), "flag_ambiguous", NA)) %>% 
+    select(-date_is_recoded)
+  
+
+  #### Other date-logic checks -------------------------------------------------
+  
+  # define flag-variable mappings
+  df_flags <- tibble(
+    flag = c(rep("flag_consult_before_onset", 2),
+             rep("flag_report_before_consult", 2),
+             rep("flag_outcome_before_consult", 2),
+             rep("flag_submit_before_consult", 2),
+             rep("flag_upload_before_report", 2)),
+    variable = c("MSF_date_consultation", "patcourse_dateonset",     # check if flag_consult_before_onset
+                 "report_date", "MSF_date_consultation",             # check if flag_report_before_consult
+                 "outcome_date_of_outcome", "MSF_date_consultation", # check if flag_outcome_before_consult
+                 "outcome_submitted_date", "MSF_date_consultation",
+                 "upload_date", "report_date"),                      # check if flag_upload_before_report
+    value = TRUE, check_date = TRUE
+  )
+  
+  dat_date_flags <- dat_date %>%
+    select(-value, -flag_ambiguous) %>%
+    tidyr::spread(variable, date) %>% 
+    mutate(flag_consult_before_onset = MSF_date_consultation < patcourse_dateonset,
+           flag_report_before_consult = report_date < MSF_date_consultation,
+           flag_outcome_before_consult = outcome_date_of_outcome < MSF_date_consultation,
+           flag_submit_before_consult = outcome_submitted_date < MSF_date_consultation,
+           flag_upload_before_report = upload_date < report_date) %>% 
+    select(db_row, patient_id, starts_with("flag")) %>% 
+    tidyr::gather(flag, value, -db_row, -patient_id) %>% 
+    mutate(value = ifelse(!value, NA, value)) %>% 
+    left_join(df_flags, by = c("flag", "value")) %>% 
+    filter(value) %>% 
+    group_by(db_row, patient_id, variable) %>% 
+    summarize(flag = paste(unique(flag), collapse = "; "), .groups = "keep") %>% 
+    ungroup()
+
+  dates_check <- dat_date %>% 
+    mutate(flag_future = ifelse(date > lubridate::today(), "flag_future", NA_character_),
+           flag_too_early = ifelse(date < as.Date("2020-02-01"), "flag_too_early", NA_character_)) %>% 
+    left_join(dat_date_flags, by = c("db_row", "patient_id", "variable")) %>% 
+    tidyr::unite("flag", flag_ambiguous, flag_too_early, flag_future, flag, na.rm = TRUE, sep = "; ") %>% 
+    mutate(flag = ifelse(flag == "", NA_character_, gsub("flag_", "", flag))) %>% 
+    group_by(db_row, patient_id) %>% 
+    mutate(check = any(!is.na(flag))) %>% 
+    ungroup() %>% 
+    filter(check) %>% 
+    select(-check) %>% 
+    filter(!is.na(value) | !is.na(date)) %>% 
+    arrange(db_row, date) %>% 
+    mutate(date_correct = NA_character_, comment = NA_character_) %>% 
+    select(patient_id, variable, value, date, date_correct, flag, comment)
+  
+
   ## check for non-missing values not converted to date
-  if (any(dat_date$flag)) {
+  if (nrow(dates_check) > 0) {
     
-    dat_date_flag <- dat_date %>% 
-      filter(flag) %>% 
-      select(db_row) %>%
-      unique() %>% 
-      left_join(dat_date, by = "db_row") %>% 
-      mutate(flag = ifelse(!flag, NA, flag)) %>% 
-      filter(!is.na(value)) %>% 
-      group_by(db_row) %>% 
-      arrange(date) %>% 
-      ungroup() %>% 
-      mutate(date_correct = NA_character_, comment = NA_character_) %>% 
-      select(patient_id, variable, value, date, date_correct, flag, comment)
-      
-    file_out <- glue("dates_check_{country}_{time_stamp()}.xlsx")
+    write_pretty_xlsx(
+      dates_check,
+      file = file.path(path_cleaning, glue("dates_check_{country}_{time_stamp()}.xlsx")),
+      group_shade = "patient_id"
+    )
     
-    write_pretty_xlsx(dat_date_flag,
-                      file = file.path(path_cleaning, file_out),
-                      group_shade = "patient_id")
-    
-    nambig <- sum(dat_date_flag$flag, na.rm = TRUE)
+    nambig <- sum(!is.na(dates_check$flag), na.rm = TRUE)
     message(paste(nambig, "ambiguous dates written to file"))
   }
   
+  
   ## merge cleaned date columns back into dat
   dat_dates_clean <- dat_date %>%
-    select(-value, -flag) %>%
+    select(-value, -flag_ambiguous) %>%
     tidyr::spread(variable, date) %>% 
     left_join_replace(x = dat_numeric_clean, y = ., cols_match = c("db_row", "patient_id"))
-  
-  ## possible additional date checks to implement
-  # all date variables <= today
-  # all date variables >= 2020-02-01
-  # report_date > patcourse_dateonset
-  # outcome_onset_symptom >= patcourse_dateonset
   
   
   #### Clean categorical variables ---------------------------------------------

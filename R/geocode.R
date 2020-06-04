@@ -46,7 +46,7 @@ clean_geo <- function(dat,
   ## geo reference file
   georef_file <- file.path(path_shapefiles,
                            country,
-                           glue("adm_reference_{country}.rds"))
+                           glue::glue("adm_reference_{country}.rds"))
   
   ## if we have a geo reference DB for given country...
   if (file.exists(georef_file)) {
@@ -97,6 +97,7 @@ clean_geo <- function(dat,
                                     code_col = "pcode") %>% 
       select(-level)
     
+    
     ## write file for manual correction
     df_manual_check_full_join <- df_manual_check_full %>%
       select(starts_with("adm"))
@@ -111,8 +112,9 @@ clean_geo <- function(dat,
     }
     
     out_check <- df_match_best %>% 
+      janitor::remove_empty("rows") %>% 
       anti_join(df_manual_check_full_join, by = raw_names) %>%
-      filter(is.na(match_type) | match_type %in% c("best_single", "best_multi")) %>% 
+      filter(is.na(match_type) | grepl("best", match_type)) %>% 
       mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
              level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
       arrange(level_ref, adm1, adm2, adm3, adm4) %>% 
