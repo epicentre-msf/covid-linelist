@@ -14,6 +14,7 @@ clean_linelist <- function(dat,
                            path_cleaning,
                            path_dictionaries,
                            dict_factors,
+                           dict_countries,
                            write_checks) {
 
   ## requires
@@ -39,6 +40,7 @@ clean_linelist <- function(dat,
                  "NER" = "fr",
                  "HTI" = "fr",
                  "CAF" = "fr",
+                 "BFA" = "fr",
                  "MEX" = "es",
                  "VEN" = "es",
                  "en")
@@ -49,6 +51,27 @@ clean_linelist <- function(dat,
   
   
   #### Clean numeric variables -------------------------------------------------
+  
+  ## Recalculate Comcond_present
+  comcond_n <- dat %>% 
+    select(starts_with("Comcond"), -Comcond_present) %>% 
+    mutate(Comcond_other = ifelse(!is.na(Comcond_other), "Yes", NA_character_)) %>% 
+    apply(1, function(x) as.character(sum(tolower(x) %in% c('yes', 'oui', 'si') & !is.na(x), na.rm = TRUE)))
+  
+  comcond_missing <- dat %>% 
+    select(starts_with("Comcond"), -Comcond_present) %>% 
+    apply(1, function(x) all(tolower(x) %in% c('unknown', 'inconnu', 'no conocido') | is.na(x)))
+  
+  comcond_n[comcond_missing] <- NA_character_
+  
+  comcond_bad <- dat$Comcond_present[!(is.na(dat$Comcond_present) & is.na(comcond_n) | dat$Comcond_present == comcond_n)]
+  
+  if (length(comcond_bad) > 0) {
+    dat$Comcond_present <- comcond_n
+    message("The following values of Comcond_present will be re-calculated: ",
+            paste(comcond_bad, collapse = "; "))
+  }
+  
   
   ## prepare dictionary
   dict_numeric_prep <- dict_numeric_correct %>% 
@@ -81,7 +104,7 @@ clean_linelist <- function(dat,
       filter(flag) %>% 
       select(patient_id, variable, value) %>% 
       mutate(replace = NA_character_) %>% 
-      print()
+      print(n = 100)
   }
   
   ## merge cleaned numeric columns back into dat_numeric
@@ -100,9 +123,14 @@ clean_linelist <- function(dat,
     full.names = TRUE
   )
   
-  dict_dates <- dplyr::bind_rows(lapply(check_files, check_files_to_dict))
-  if (nrow(dict_dates) == 0) dict_dates <- NULL
+  dict_dates_full <- dplyr::bind_rows(lapply(check_files, check_files_to_dict))
+  if (nrow(dict_dates_full) == 0) dict_dates_full <- create_empty_dict_dates()
+  dict_dates_ignore <- filter(dict_dates_full, ignore)
   
+  dict_dates <- dict_dates_full %>% 
+    filter(!ignore) %>% 
+    select(-flag, -ignore) %>% 
+    unique()
   
   ## gather date columns
   dat_date <- dat_numeric_clean %>%
@@ -129,15 +157,8 @@ clean_linelist <- function(dat,
     arrange(db_row, patient_id) %>% 
     mutate(date = as.Date(value))
   
-  if (!is.null(dict_dates)) {
-    dat_date <- dat_date %>% 
-      repi::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE)
-  } else {
-    dat_date <- dat_date %>% 
-      mutate(date_is_recoded = FALSE)
-  }
-  
   dat_date <- dat_date %>% 
+    repi::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE) %>% 
     mutate(flag_ambiguous = ifelse(!date_is_recoded & !is.na(value) & is.na(date), "flag_ambiguous", NA)) %>% 
     select(-date_is_recoded)
   
@@ -182,6 +203,7 @@ clean_linelist <- function(dat,
     left_join(dat_date_flags, by = c("db_row", "patient_id", "variable")) %>% 
     tidyr::unite("flag", flag_ambiguous, flag_too_early, flag_future, flag, na.rm = TRUE, sep = "; ") %>% 
     mutate(flag = ifelse(flag == "", NA_character_, gsub("flag_", "", flag))) %>% 
+    anti_join(dict_dates_ignore, by = c("patient_id", "variable", "flag")) %>% 
     group_by(db_row, patient_id) %>% 
     mutate(check = any(!is.na(flag))) %>% 
     ungroup() %>% 
@@ -227,15 +249,33 @@ clean_linelist <- function(dat,
   dat_factors_clean <- dat_dates_clean %>% 
     mutate_at(unique(dict_factors$variable), hmatch::string_std) %>% 
     matchmaker::match_df(dictionary = dict_factors_prep) %>% 
-    matchmaker::match_df(dictionary = dict_factors_correct)
+    matchmaker::match_df(dictionary = dict_factors_correct) %>% 
+    mutate(patcourse_ecmo = case_when(country == "MLI" & patcourse_ecmo == "Oui" ~ "Non"),
+           outcome_patcourse_ecmo = case_when(country == "MLI" & outcome_patcourse_ecmo == "Oui" ~ "Non"))
   
-  ## test for nonvalid values
+  
+  ## test for non-valid country-code values
+  dict_countries_prep <- tidyr::expand_grid(
+    value = c(unique(dict_countries$iso), "Unknown"),
+    var = c("report_country",
+            "patinfo_idadmin0",
+            "patinfo_resadmin0",
+            "patinfo_occuhcw_country",
+            "expo_case_location")
+  )
+  
+  nonvalid_iso <- matchmaker::check_df(dat_factors_clean,
+                                       dict_countries_prep,
+                                       always_allow_na = TRUE)
+  
+  ## test all other factors variables for nonvalid values
   nonvalid <- matchmaker::check_df(dat_factors_clean,
                                    dict_factors_prep,
                                    col_vals = 2,
                                    col_vars = 3,
                                    always_allow_na = TRUE,
-                                   return_allowed = TRUE)
+                                   return_allowed = TRUE) %>% 
+    dplyr::bind_rows(nonvalid_iso)
   
   if (nrow(nonvalid) > 0) {
     message("Some categorical variables contain nonvalid values:")

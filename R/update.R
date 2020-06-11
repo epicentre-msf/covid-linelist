@@ -24,6 +24,7 @@ update_linelist <- function(path_data_raw,
                             path_shapefiles,
                             country,
                             dict_facilities,
+                            dict_countries,
                             dict_factors,
                             dict_extra_vars,
                             ll_template,
@@ -55,11 +56,19 @@ update_linelist <- function(path_data_raw,
                                 dict_facilities = dict_facilities,
                                 dict_extra_vars = dict_extra_vars)
     
+    # remove any rows missing MSF_N_Patient
+    n_missing_id <- sum(is.na(dat_raw$MSF_N_Patient))
+    if (n_missing_id > 0) {
+      message(n_missing_id, " rows with missing MSF_N_Patient removed")
+      dat_raw <- filter(dat_raw, !is.na(MSF_N_Patient))
+    }
+    
     # full linelist cleaning
     dat_clean <- clean_linelist(dat_raw,
                                 path_cleaning,
                                 path_dictionaries,
                                 dict_factors = dict_factors,
+                                dict_countries = dict_countries,
                                 write_checks = write_checks)
     
     # derive age_in_years

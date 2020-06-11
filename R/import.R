@@ -72,12 +72,18 @@ import_linelists <- function(path_data_raw,
 #'
 #' @param path_data_raw Path to directory containing linelists
 #' @param country Country ISO code
+#' @param dict_facilities Dictionary with facility-level metadata
+#' @param return_latest Logical indicating whether to return only the most
+#'   recent linelist by site
 #'
 #' @return
 #' A tibble with one row per facility, with columns identifying the most
 #' recent linelist file to import, including file_path, upload_date, etc.
 #' 
-scan_sheets <- function(path_data_raw, country, dict_facilities) {
+scan_sheets <- function(path_data_raw,
+                        country,
+                        dict_facilities,
+                        return_latest = TRUE) {
 
   ## requires
   library(dplyr)
@@ -118,12 +124,16 @@ scan_sheets <- function(path_data_raw, country, dict_facilities) {
     select(-site_name, -project) %>% 
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
     select(-site_name_join) %>% 
-    group_by(site) %>%
-    arrange(desc(upload_date)) %>% 
-    slice(1) %>%
-    ungroup() %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))
   
+  if (return_latest) {
+    df_sheet <- df_sheet %>% 
+      group_by(site) %>%
+      arrange(desc(upload_date)) %>% 
+      slice(1) %>%
+      ungroup()
+  }
+ 
   ## return
   df_sheet
 }

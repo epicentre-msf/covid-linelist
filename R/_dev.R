@@ -18,13 +18,16 @@ path_export <- file.path(path_onedrive, "data/linelist/HIS-export")
 path_export_fp <- file.path(path_onedrive, "coordination/Surveillance focal points coordination/Data compilation")
 path_export_global <- file.path(path_onedrive, "data/linelist/world")
 path_dict_master <- file.path(path_onedrive, "template/linelist/dev/dico")
+path_dict_countries <- file.path(path_onedrive, "template/linelist/dev/base_geo/WORLD_1_20200403.xlsx")
+
 
 
 ### Read dictionaries
 dict_facilities <- read_xlsx(file.path(path_dictionaries, "dict_facilities.xlsx"))
+dict_countries <- read_xlsx(path_dict_countries)
 dict_factors <- read_xlsx(file.path(path_dictionaries, "dict_factors.xlsx"))
 dict_extra_vars <- read_xlsx(file.path(path_dictionaries, "dict_extra_vars.xlsx"))
-ll_template <- names(readxl::read_xlsx(file.path(path_dictionaries, "ll_template_v1.1.xlsx")))
+ll_template <- names(read_xlsx(file.path(path_dictionaries, "ll_template_v1.1.xlsx")))
 
 
 ### Clean/compile country-specific linelists
@@ -40,11 +43,12 @@ countries <- c("AFG", "KEN", "IRQ",
                "GIN", "MLI", "SDN",
                "SSD", "NER", "YEM",
                "HTI", "VEN", "GRC",
-               "CAF")
+               "CAF", "SYR", "TZA",
+               "BFA", "IND")
 
 for (country in countries) {
   
-  # country <- "BGD"
+  # country <- "CMR"
   
   # run update routines
   d_country <- update_linelist(path_data_raw = path_data_raw,
@@ -53,6 +57,7 @@ for (country in countries) {
                                path_dictionaries = path_dictionaries,
                                country = country,
                                dict_facilities = dict_facilities,
+                               dict_countries = dict_countries,
                                dict_factors = dict_factors,
                                dict_extra_vars = dict_extra_vars,
                                ll_template = ll_template,
@@ -66,9 +71,9 @@ for (country in countries) {
   # 
   # ref <- fetch_georef(country)
   # 
-  # ref %>% 
-  #   filter(grepl("beyede", adm4, ignore.case = TRUE)) %>% 
-  #   print(n = "all")
+  # ref %>%
+  #   filter(adm1 == "Sikasso") %>%
+  #   filter(grepl("mfou", adm4, ignore.case = TRUE))
   
   
   # write country-specific compilation to local folder

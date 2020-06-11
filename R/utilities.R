@@ -22,13 +22,27 @@ check_files_to_dict <- function(path) {
   
   out <- read_xlsx(path, col_types = "text") %>% 
     filter(!is.na(value), !is.na(date_correct)) %>%
-    mutate(date = as.character(date_correct),   # overwrite date with date_corrected
+    mutate(ignore = ifelse(date_correct == ".ignore", TRUE, FALSE),
+           date_correct = ifelse(date_correct == ".ignore", NA_character_, date_correct),
+           date = ifelse(ignore, as.character(value), as.character(date_correct)),   # overwrite date with date_corrected
            date = ifelse(date == ".na", NA_character_, date),
            date = vapply(date, parse_excel_dates, ""),
            date = as.Date(date)) %>%
-    dplyr::select(patient_id, variable, value, date)
+    dplyr::select(patient_id, variable, value, date, flag, ignore)
   
   return(out)
+}
+
+
+create_empty_dict_dates <- function() {
+  tibble::tibble(
+    patient_id = character(0),
+    variable = character(0),
+    value = character(0),
+    date = as.Date(character(0)),
+    flag = character(0),
+    ignore = logical(0)
+  )
 }
 
 
@@ -290,7 +304,8 @@ age_to_years <- function(value, unit) {
 # write nicely-formatted Excel file using openxlsx
 write_pretty_xlsx <- function(x, file, fill = "#ffcccb", date_format = "yyyy-mm-dd",
                               firstActiveRow = 2, firstActiveCol = NULL, zoom = 130,
-                              group_shade = NULL, overwrite = TRUE) {
+                              group_shade = NULL, overwrite = TRUE,
+                              return_wb = FALSE) {
   library(openxlsx)
   options("openxlsx.dateFormat" = date_format)
   wb <- openxlsx::createWorkbook()
@@ -316,7 +331,10 @@ write_pretty_xlsx <- function(x, file, fill = "#ffcccb", date_format = "yyyy-mm-
                                     style = openxlsx::createStyle(bgFill = fill))
   }
   
-  suppressMessages(openxlsx::saveWorkbook(wb, file = file, overwrite = overwrite))
+  if (return_wb) {
+    return(wb)
+  } else {
+    suppressMessages(openxlsx::saveWorkbook(wb, file = file, overwrite = overwrite))
+  }
 }
-
 

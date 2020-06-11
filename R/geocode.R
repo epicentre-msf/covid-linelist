@@ -29,6 +29,8 @@ clean_geo <- function(dat,
     dat <- dat_clean
   }
   
+  ## shape
+  shape <- unique(dat$shape)
   
   ## prep dat for geocoding
   col_order <- names(dat)
@@ -45,19 +47,17 @@ clean_geo <- function(dat,
   
   ## geo reference file
   georef_file <- file.path(path_shapefiles,
-                           country,
-                           glue::glue("adm_reference_{country}.rds"))
+                           shape,
+                           glue::glue("adm_reference_{shape}.rds"))
   
   ## if we have a geo reference DB for given country...
   if (file.exists(georef_file)) {
     
-    df_geo_ref <- readRDS(file.path(path_shapefiles,
-                                    country,
-                                    glue("adm_reference_{country}.rds")))
+    df_geo_ref <- readRDS(georef_file)
     
     ## manual corrections
     file_recode <- list_files(path_cleaning,
-                              pattern = glue::glue("geocodes_recode_{country}"),
+                              pattern = glue::glue("geocodes_recode_{shape}"),
                               full.names = TRUE,
                               last.sorted = TRUE)
     
@@ -68,7 +68,7 @@ clean_geo <- function(dat,
     }
     
     df_manual_check_full <- list_files(path_cleaning,
-                                       pattern = glue("geocodes_check_{country}"),
+                                       pattern = glue("geocodes_check_{shape}"),
                                        full.names = TRUE) %>%
       lapply(read_geo_manual) %>%
       dplyr::bind_rows() %>%
@@ -91,7 +91,7 @@ clean_geo <- function(dat,
     df_match_best <- hmatch::hmatch(raw = df_geo_raw,
                                     ref = df_geo_ref,
                                     man = df_geo_manual,
-                                    pattern_raw = "^adm",
+                                    pattern = "^adm",
                                     dict = dict_recode,
                                     fuzzy = TRUE,
                                     code_col = "pcode") %>% 
@@ -121,7 +121,7 @@ clean_geo <- function(dat,
       mutate(pcode_new = NA_character_, comment = NA_character_)
     
     if (write_checks & nrow(out_check) > 0) {
-      file_out <- glue("geocodes_check_{country}_{time_stamp()}.xlsx")
+      file_out <- glue("geocodes_check_{shape}_{time_stamp()}.xlsx")
       write_pretty_xlsx(out_check,
                         file = file.path(path_cleaning, file_out),
                         group_shade = "level_ref", zoom = 145)
@@ -162,6 +162,25 @@ clean_geo <- function(dat,
       setNames(gsub("__res_ref$", "__res", names(.))) %>% 
       setNames(gsub("_pcode$", "_pcode__res", names(.))) %>% 
       arrange(db_row)
+    
+    # ## check patinfo_idadmin0/patinfo_idadmin1
+    # dat %>% 
+    #   filter(patinfo_idadmin1 == "North east")
+    # 
+    # raw <- dat %>% 
+    #   select(patinfo_idadmin0, patinfo_idadmin1) %>% 
+    #   filter(!is.na(patinfo_idadmin1)) %>% 
+    #   unique()
+    # 
+    # ref_prep <- df_geo_ref %>% 
+    #   filter(level == 1) %>% 
+    #   mutate(adm0 = country) %>% 
+    #   select(adm0, adm1)
+    # 
+    # hmatch(raw,
+    #        ref_prep,
+    #        by = c("patinfo_idadmin0", "patinfo_idadmin1"),
+    #        by_ref = c("adm0", "adm1"))
     
   } else {
     
