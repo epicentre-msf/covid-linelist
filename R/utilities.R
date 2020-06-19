@@ -1,4 +1,65 @@
 
+parse_excel_dates <- function(x) {
+  dplyr::if_else(grepl("^[[:digit:]]{4,6}$", x), # if likely excel-numeric
+                 suppressWarnings(as.character(janitor::excel_numeric_to_date(as.integer(x)))),
+                 x)
+}
+
+
+parse_other_dates <- function(x, order = c("%d/%m/%Y", "%Y-%m-%d")) {
+  dplyr::if_else(grepl("\\/", x), # if other date format
+                 suppressWarnings(as.character(lubridate::parse_date_time(x, order = order))),
+                 x)
+}
+
+
+min_safe <- function(x) {
+  if (all(is.na(x))) {
+    vctrs::vec_cast(NA, x)
+  } else {
+    min(x, na.rm = TRUE)
+  }
+}
+
+max_safe <- function(x) {
+  if (all(is.na(x))) {
+    vctrs::vec_cast(NA, x)
+  } else {
+    max(x, na.rm = TRUE)
+  }
+}
+
+
+get_site_meta <- function(file_path) {
+  
+  df <- readxlsb::read_xlsb(
+    file_path,
+    sheet = "options",
+    col_types = "string"
+  )
+  
+  language <- df$value[df$variable == "language"]
+  version <- df$value[df$variable == "version"]
+  
+  return(tibble::tibble(linelist_lang = language, linelist_vers = version))
+}
+
+
+
+bind_queries <- function(..., col_arrange = c("country", "site", "MSF_N_Patient")) {
+  # requires dplyr >= 1.0
+  # library(dplyr)
+  out <- dplyr::bind_rows(...)
+  arrange(out, dplyr::across(all_of(col_arrange)))
+}
+
+
+valid_numeric <- function(x) {
+  xnum <- suppressWarnings(as.numeric(x))
+  is.na(x) | (!is.na(x) & !is.na(xnum))
+}
+
+
 
 test_duplicated <- function(x, name) {
   dups <- duplicated(x)
@@ -336,5 +397,73 @@ write_pretty_xlsx <- function(x, file, fill = "#ffcccb", date_format = "yyyy-mm-
   } else {
     suppressMessages(openxlsx::saveWorkbook(wb, file = file, overwrite = overwrite))
   }
+}
+
+
+
+get_date_differences <- function(x, col) {
+  
+  dat_diff <- mutate_all(x, as.integer) - as.integer(x[[col]])
+  
+  dat_diff %>% 
+    as_tibble() %>% 
+    gather("variable", "value") %>% 
+    mutate(variable_focal = col, .before = 2,
+           variable_label = paste0(variable, " - ", variable_focal)) %>% 
+  filter(variable != variable_focal)
+}
+
+
+
+write_query_tracker <- function(queries_out, header_recode, site_focal = NULL, path) {
+  
+  if (!is.null(site_focal)) {
+    queries_out <- queries_out %>% 
+      filter(site == site_focal)
+  }
+  
+  queries_summary <- queries_out %>% 
+    group_by(category, query_id, description) %>% 
+    summarize(n_total = n(), .groups = "drop") %>% 
+    arrange(desc(n_total)) %>% 
+    select(Category = category, `Query ID` = query_id, `N (Total)` = n_total, Description = description)
+  
+  queries_out <- queries_out %>% 
+    rename(!!!header_recode)
+  
+  ## Write updated query tracker sheets to file
+  library(openxlsx)
+  options("openxlsx.dateFormat" = "yyyy-mm-dd")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Queries", zoom = 130)
+  hs <- openxlsx::createStyle(halign = "center", textDecoration = "Bold")
+  
+  # sheet 1 (Main query tracker)
+  openxlsx::writeData(wb, 1, queries_out, withFilter = TRUE)
+  openxlsx::setColWidths(wb, 1, cols = 1:ncol(queries_out),
+                         widths = c(6, 15, 14, 10, 12, 13, 15, 20, 15, 20, 15, 100, 40, 30, 40, 30, 22, 17, 22, 17, 22, 70))
+  openxlsx::freezePane(wb, 1, firstActiveRow = 2)
+  openxlsx::addStyle(wb, 1, style = hs, rows = 1, cols = 1:ncol(queries_out), gridExpand = TRUE)
+  openxlsx::conditionalFormatting(wb, 1,
+                                  cols = 1:ncol(queries_out),
+                                  rows = 2:(nrow(queries_out) + 1L),
+                                  rule = paste0("$A2>0"),
+                                  style = openxlsx::createStyle(bgFill = "#fddbc7"))
+  
+  # sheet 2 (summary)
+  openxlsx::addWorksheet(wb, "Summary", zoom = 130)
+  openxlsx::writeData(wb, 2, queries_summary)
+  openxlsx::freezePane(wb, 2, firstActiveRow = 2)
+  openxlsx::addStyle(wb, 2, style = hs, rows = 1, cols = 1:ncol(queries_summary), gridExpand = TRUE)
+  openxlsx::setColWidths(wb, 2, cols = 1:ncol(queries_summary),
+                         widths = c(21, 14, 10, 110))
+  
+  suppressMessages(
+    openxlsx::saveWorkbook(
+      wb,
+      file = path,
+      overwrite = TRUE
+    )
+  )
 }
 

@@ -13,6 +13,7 @@
 clean_linelist <- function(dat,
                            path_cleaning,
                            path_dictionaries,
+                           date_vars,
                            dict_factors,
                            dict_countries,
                            write_checks) {
@@ -28,7 +29,7 @@ clean_linelist <- function(dat,
   ## if running manually
   if (FALSE) {
     dat <- dat_raw
-    write_checks <- FALSE
+    write_checks <- TRUE
   }
   
   ## linelist language
@@ -125,6 +126,7 @@ clean_linelist <- function(dat,
   
   dict_dates_full <- dplyr::bind_rows(lapply(check_files, check_files_to_dict))
   if (nrow(dict_dates_full) == 0) dict_dates_full <- create_empty_dict_dates()
+  # TODO: fix problem with prev-changed vars getting ignore in new queries
   dict_dates_ignore <- filter(dict_dates_full, ignore)
   
   dict_dates <- dict_dates_full %>% 
@@ -134,28 +136,12 @@ clean_linelist <- function(dat,
   
   ## gather date columns
   dat_date <- dat_numeric_clean %>%
-    select(db_row,
-           patient_id,
-           upload_date,
-           report_date,
-           Lab_date1,
-           patcourse_dateonset,
-           ends_with("date_onset"),
-           MSF_date_consultation,
-           patcourse_presHCF,
-           patcourse_dateiso,
-           starts_with("expo_travel_date"),
-           starts_with("expo_case_date"),
-           outcome_submitted_date,
-           outcome_patcourse_presHCF,
-           outcome_date_of_outcome,
-           outcome_lab_date,
-           MSF_date_treament1,
-           MSF_date_treament2,
-           MSF_date_treament3) %>%
+    select(db_row, patient_id, all_of(date_vars)) %>%
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     arrange(db_row, patient_id) %>% 
-    mutate(date = as.Date(value))
+    mutate(date = parse_excel_dates(value),
+           date = parse_other_dates(date),
+           date = as.Date(date))
   
   dat_date <- dat_date %>% 
     repi::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE) %>% 
@@ -167,27 +153,42 @@ clean_linelist <- function(dat,
   
   # define flag-variable mappings
   df_flags <- tibble(
-    flag = c(rep("flag_consult_before_onset", 2),
-             rep("flag_report_before_consult", 2),
+    flag = c(rep("flag_upload_before_report", 2),
+             rep("flag_report_before_onset", 2),
+             rep("flag_report_before_expo_travel", 2),
+             rep("flag_report_before_expo_case", 2),
+             rep("flag_lab1_before_expo_travel", 2),
+             rep("flag_lab1_before_expo_case", 2),
              rep("flag_outcome_before_consult", 2),
+             rep("flag_outcome_before_lab1", 2),
              rep("flag_submit_before_consult", 2),
-             rep("flag_upload_before_report", 2)),
-    variable = c("MSF_date_consultation", "patcourse_dateonset",     # check if flag_consult_before_onset
-                 "report_date", "MSF_date_consultation",             # check if flag_report_before_consult
-                 "outcome_date_of_outcome", "MSF_date_consultation", # check if flag_outcome_before_consult
+             rep("flag_submit_before_lab1", 2)),
+    variable = c("upload_date", "report_date",
+                 "report_date", "patcourse_dateonset",
+                 "report_date", "expo_travel_date1",
+                 "report_date", "expo_case_date_first1",
+                 "Lab_date1", "expo_travel_date1",
+                 "Lab_date1", "expo_case_date_first1",
+                 "outcome_date_of_outcome", "MSF_date_consultation",
+                 "outcome_date_of_outcome", "Lab_date1",
                  "outcome_submitted_date", "MSF_date_consultation",
-                 "upload_date", "report_date"),                      # check if flag_upload_before_report
+                 "outcome_submitted_date", "Lab_date1"),
     value = TRUE, check_date = TRUE
   )
   
   dat_date_flags <- dat_date %>%
     select(-value, -flag_ambiguous) %>%
     tidyr::spread(variable, date) %>% 
-    mutate(flag_consult_before_onset = MSF_date_consultation < patcourse_dateonset,
-           flag_report_before_consult = report_date < MSF_date_consultation,
+    mutate(flag_upload_before_report = upload_date < report_date,
+           flag_report_before_onset = report_date < patcourse_dateonset,
+           flag_report_before_expo_travel = report_date < expo_travel_date1,
+           flag_report_before_expo_case = report_date < expo_case_date_first1,
+           flag_lab1_before_expo_travel = Lab_date1 < expo_travel_date1,
+           flag_lab1_before_expo_case = Lab_date1 < expo_case_date_first1,
            flag_outcome_before_consult = outcome_date_of_outcome < MSF_date_consultation,
+           flag_outcome_before_lab1 = outcome_date_of_outcome < Lab_date1,
            flag_submit_before_consult = outcome_submitted_date < MSF_date_consultation,
-           flag_upload_before_report = upload_date < report_date) %>% 
+           flag_submit_before_lab1 = outcome_submitted_date < Lab_date1) %>% 
     select(db_row, patient_id, starts_with("flag")) %>% 
     tidyr::gather(flag, value, -db_row, -patient_id) %>% 
     mutate(value = ifelse(!value, NA, value)) %>% 
@@ -216,7 +217,7 @@ clean_linelist <- function(dat,
   
 
   ## check for non-missing values not converted to date
-  if (nrow(dates_check) > 0) {
+  if (nrow(dates_check) > 0 & write_checks) {
     
     write_pretty_xlsx(
       dates_check,
@@ -253,7 +254,6 @@ clean_linelist <- function(dat,
     mutate(patcourse_ecmo = case_when(country == "MLI" & patcourse_ecmo == "Oui" ~ "Non"),
            outcome_patcourse_ecmo = case_when(country == "MLI" & outcome_patcourse_ecmo == "Oui" ~ "Non"))
   
-  
   ## test for non-valid country-code values
   dict_countries_prep <- tidyr::expand_grid(
     value = c(unique(dict_countries$iso), "Unknown"),
@@ -261,7 +261,10 @@ clean_linelist <- function(dat,
             "patinfo_idadmin0",
             "patinfo_resadmin0",
             "patinfo_occuhcw_country",
-            "expo_case_location")
+            "expo_case_location",
+            "expo_travel_country1",
+            "expo_travel_country2",
+            "expo_travel_country3")
   )
   
   nonvalid_iso <- matchmaker::check_df(dat_factors_clean,

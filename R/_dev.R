@@ -1,33 +1,7 @@
 
-### Required libraries
-library(readxl)
-library(dplyr)
-library(here)
-library(glue)
-source("R/utilities.R")
+### Required libraries, paths, and global dictionaries
+source("R/zzz.R")
 
-
-### Set global paths
-path_project <- here::here()
-path_onedrive <- path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi")
-path_data_raw <- file.path(path_onedrive, "data-raw/linelist")
-path_cleaning <- file.path(path_data_raw, "cleaning")
-path_dictionaries <- file.path(path_cleaning, "dictionaries")
-path_shapefiles <- file.path(path_onedrive, "data/shapefiles")
-path_export <- file.path(path_onedrive, "data/linelist/HIS-export")
-path_export_fp <- file.path(path_onedrive, "coordination/Surveillance focal points coordination/Data compilation")
-path_export_global <- file.path(path_onedrive, "data/linelist/world")
-path_dict_master <- file.path(path_onedrive, "template/linelist/dev/dico")
-path_dict_countries <- file.path(path_onedrive, "template/linelist/dev/base_geo/WORLD_1_20200403.xlsx")
-
-
-
-### Read dictionaries
-dict_facilities <- read_xlsx(file.path(path_dictionaries, "dict_facilities.xlsx"))
-dict_countries <- read_xlsx(path_dict_countries)
-dict_factors <- read_xlsx(file.path(path_dictionaries, "dict_factors.xlsx"))
-dict_extra_vars <- read_xlsx(file.path(path_dictionaries, "dict_extra_vars.xlsx"))
-ll_template <- names(read_xlsx(file.path(path_dictionaries, "ll_template_v1.1.xlsx")))
 
 
 ### Clean/compile country-specific linelists
@@ -44,11 +18,12 @@ countries <- c("AFG", "KEN", "IRQ",
                "SSD", "NER", "YEM",
                "HTI", "VEN", "GRC",
                "CAF", "SYR", "TZA",
-               "BFA", "IND")
+               "BFA", "IND", "ETH",
+               "TJK")
 
 for (country in countries) {
   
-  # country <- "CMR"
+  # country <- "CAF"
   
   # run update routines
   d_country <- update_linelist(path_data_raw = path_data_raw,
@@ -56,13 +31,15 @@ for (country in countries) {
                                path_cleaning = path_cleaning,
                                path_dictionaries = path_dictionaries,
                                country = country,
+                               date_vars = date_vars,
                                dict_facilities = dict_facilities,
+                               dict_linelist = dict_linelist,
                                dict_countries = dict_countries,
                                dict_factors = dict_factors,
                                dict_extra_vars = dict_extra_vars,
-                               ll_template = ll_template,
                                run_cleaning = TRUE,
-                               write_checks = TRUE)
+                               write_checks = FALSE)
+  
   
   # d_country %>%
   #   select(site, MSF_admin_location_past_week, matches("name__res$")) %>%
@@ -72,9 +49,8 @@ for (country in countries) {
   # ref <- fetch_georef(country)
   # 
   # ref %>%
-  #   filter(adm1 == "Sikasso") %>%
-  #   filter(grepl("mfou", adm4, ignore.case = TRUE))
-  
+  #   # filter(adm1 == "Cox's Bazar Paurashava") %>%
+  #   filter(grepl("lando", adm4, ignore.case = TRUE))
   
   # write country-specific compilation to local folder
   saveRDS(d_country, glue("local/msf_covid19_linelist_{country}.rds"))
@@ -85,51 +61,37 @@ for (country in countries) {
 d_global <- list.files("local", pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   lapply(readRDS) %>% 
   dplyr::bind_rows() %>% 
+  rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
   mutate(db_row = 1:n())
 
 
-path_out_global <- file.path(path_export_global, glue("msf_covid19_linelist_global_{lubridate::today()}"))
-write_pretty_xlsx(d_global, paste0(path_out_global, ".xlsx"))
-saveRDS(d_global, paste0(path_out_global, ".rds"))
+if (FALSE) {
+  path_out_global <- file.path(path_export_global, glue("msf_covid19_linelist_global_{lubridate::today()}"))
+  write_pretty_xlsx(d_global, paste0(path_out_global, ".xlsx"))
+  saveRDS(d_global, paste0(path_out_global, ".rds"))
+}
+
 
 
 
 ### Write OC-specific files
-oc_list <- unique(d_global$OC)
-
-d_global_prep <- d_global %>% 
-  mutate(across(c(upload_date,
-                  report_date,
-                  Lab_date1,
-                  patcourse_dateonset,
-                  matches("MSF_symptom_.*_date_onset"),
-                  MSF_date_consultation,
-                  patcourse_presHCF,
-                  patcourse_dateiso,
-                  starts_with("expo_travel_date"),
-                  starts_with("expo_case_date"),
-                  outcome_submitted_date,
-                  outcome_patcourse_presHCF,
-                  outcome_date_of_outcome,
-                  outcome_lab_date,
-                  MSF_date_treament1,
-                  MSF_date_treament2,
-                  MSF_date_treament3),
-                .fns = date_format))
+# note: was previously missing outcome_onset_symptom from date var explicit "NA"
+d_global_prep <- mutate(d_global, across(all_of(date_vars), .fns = date_format))
+OC_list <- unique(d_global$OC)
 
 
-for (oc_focal in oc_list) {
-  
-  file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(oc_focal)}_{lubridate::today()}.xlsx")
-  
-  # HIS-export
-  d_oc_his <- filter(d_global_prep, OC == oc_focal)
-  path_out1_oc <- file.path(path_export, oc_focal, file_out_oc)
-  write_pretty_xlsx(d_oc_his, path_out1_oc)
-  
-  # focal point
-  d_oc_foc <- filter(d_global, OC == oc_focal)
-  path_out2_oc <- file.path(path_export_fp, oc_focal, file_out_oc)
-  write_pretty_xlsx(d_oc_foc, path_out2_oc)
+if (FALSE) {
+  for (OC_focal in OC_list) {
+    file_out_oc <- glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
+    
+    # HIS-export
+    d_oc_his <- filter(d_global_prep, OC == OC_focal)
+    path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
+    write_pretty_xlsx(d_oc_his, path_out1_oc)
+    
+    # focal point
+    d_oc_foc <- filter(d_global, OC == OC_focal)
+    path_out2_oc <- file.path(path_export_fp, OC_focal, file_out_oc)
+    write_pretty_xlsx(d_oc_foc, path_out2_oc)
+  }
 }
-

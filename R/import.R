@@ -2,9 +2,9 @@
 #'
 #' @param path_data_raw Path to directory containing linelists
 #' @param country Country ISO code
-#' @param ll_template Vector of column names in original linelists
 #' @param dict_facilities Dictionary mapping site-ID columns (country, OC,
 #'   project) to site codes
+#' @param dict_linelist Master linelist variable dictionary
 #'
 #' @return
 #' Combined linelist <tibble> created by binding together the most recent
@@ -13,8 +13,8 @@
 #' 
 import_linelists <- function(path_data_raw,
                              country,
-                             ll_template,
                              dict_facilities,
+                             dict_linelist,
                              dict_extra_vars) {
   
   ## requires
@@ -30,6 +30,8 @@ import_linelists <- function(path_data_raw,
   cols_derive <- c("db_row",
                    "linelist_row",
                    "upload_date",
+                   "linelist_lang",
+                   "linelist_vers",
                    "country",
                    "shape",
                    "OC",
@@ -49,7 +51,9 @@ import_linelists <- function(path_data_raw,
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
   
+  
   ## columns to add (from original ll template)
+  ll_template <- dict_linelist$code_name
   cols_to_add <- setdiff(ll_template, names(df_data))
   df_data[cols_to_add] <- NA_character_
   
@@ -143,27 +147,32 @@ scan_sheets <- function(path_data_raw,
 #' Read and prepare individual linelist file
 #'
 #' @param file_path Path to linelist
+#' @param dict_extra_vars Dictionary defining standardized column names for
+#'   MSF_extra_* variables
 #'
 #' @return
 #' Linelist <tibble> for a single facility, after minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #'
-read_and_prepare_data <- function(file_path,
-                                  dict_extra_vars) {
+read_and_prepare_data <- function(file_path, dict_extra_vars) {
 
   ## requires
   library(dplyr)
   library(janitor)
   library(readxlsb)
+  source("R/utilities.R")
   
   ## read linelist from relevant excel sheet
   df <- readxlsb::read_xlsb(file_path,
                             sheet = "linelist",
                             col_types = "string")
   
+  ## get linelist version and language
+  df_meta <- get_site_meta(file_path)
+  
   if (nrow(df) > 0) {
     ## check for column names beginning with ".." (missing name in excel file)
-    if (any(stringr::str_detect(names(df), "^\\.\\."))) {
+    if (any(grepl("^\\.\\.", names(df)))) {
       stop("Missing column names in file: ", file_path)
     }
     
@@ -174,7 +183,8 @@ read_and_prepare_data <- function(file_path,
       janitor::remove_empty(which = c("rows")) %>%
       dplyr::rename_with(., .fn = recode_columns, dict_extra_vars = dict_extra_vars) %>%
       mutate(linelist_row = seq_len(n())) %>% 
-      select(linelist_row, everything())
+      select(linelist_row, everything()) %>% 
+      bind_cols(df_meta, .)
     
   } else {
     out <- tibble(linelist_row = integer(0))
@@ -186,6 +196,10 @@ read_and_prepare_data <- function(file_path,
 
 
 recode_columns <- function(x, dict_extra_vars) {
+  
+  # requires
+  library(dplyr)
+  library(hmatch)
   
   # standardize extra names dict
   dict_extra_vars_prep <- dict_extra_vars %>% 
