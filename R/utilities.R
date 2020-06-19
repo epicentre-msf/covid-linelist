@@ -415,7 +415,7 @@ get_date_differences <- function(x, col) {
 
 
 
-write_query_tracker <- function(queries_out, header_recode, site_focal = NULL, path) {
+write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   
   if (!is.null(site_focal)) {
     queries_out <- queries_out %>% 
@@ -427,6 +427,31 @@ write_query_tracker <- function(queries_out, header_recode, site_focal = NULL, p
     summarize(n_total = n(), .groups = "drop") %>% 
     arrange(desc(n_total)) %>% 
     select(Category = category, `Query ID` = query_id, `N (Total)` = n_total, Description = description)
+  
+  header_recode <- c(
+    "i" = "i",
+    "Query group" = "query_group",
+    "Query #" = "query_number",
+    "OC" = "OC",
+    "Country" = "country",
+    "Site" = "site",
+    "Upload date" = "upload_date",
+    "# Patient" = "MSF_N_Patient",
+    "Row (export)" = "linelist_row",
+    "Query category" = "category",
+    "Query ID" = "query_id",
+    "Description" = "description",
+    "Variable 1" = "variable1",
+    "Value 1" = "value1",
+    "Variable 2" = "variable2",
+    "Value 2" = "value2",
+    "Date query generated" = "date_generated",
+    "Resolved (auto)" = "resolved_auto",
+    "Date resolved (auto)" = "date_resolved_auto",
+    "Resolved (field)" = "resolved_field",
+    "Date resolved (field)" = "date_resolved_field",
+    "Comment (field)" = "comment"
+  )
   
   queries_out <- queries_out %>% 
     rename(!!!header_recode)
@@ -465,5 +490,25 @@ write_query_tracker <- function(queries_out, header_recode, site_focal = NULL, p
       overwrite = TRUE
     )
   )
+}
+
+
+
+write_query_tracker_site <- function(queries_out) {
+  
+  paths_oc_site <- distinct(queries_out, OC, site) %>% 
+    arrange(OC, site) %>% 
+    mutate(path_site = file.path(path_export_fp, OC, "queries", site),
+           path_file = file.path(path_site, glue("query_tracker_{site}_{today()}.xlsx")))
+  
+  for (i in seq_len(nrow(paths_oc_site))) {
+    if (!dir.exists(paths_oc_site$path_site[i])) {
+      dir.create(paths_oc_site$path_site[i])
+    }
+    
+    write_query_tracker(queries_out,
+                        site_focal = paths_oc_site$site[i],
+                        path = paths_oc_site$path_file[i])
+  }
 }
 
