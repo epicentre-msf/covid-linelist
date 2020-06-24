@@ -1,21 +1,24 @@
 #' Import, standardize, and combine linelists from each facility
 #'
-#' @param path_data_raw Path to directory containing linelists
 #' @param country Country ISO code
+#' @param path_data_raw Path to directory containing linelists
 #' @param dict_facilities Dictionary mapping site-ID columns (country, OC,
 #'   project) to site codes
-#' @param dict_linelist Master linelist variable dictionary
+#' @param dict_linelist Main linelist dictionary
+#' @param dict_extra_vars Dictionary for renaming additional variables
+#' @param dict_vars_exclude Dictionary of empty variables exported from v2
 #'
 #' @return
 #' Combined linelist <tibble> created by binding together the most recent
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_linelists <- function(path_data_raw,
-                             country,
+import_linelists <- function(country,
+                             path_data_raw,
                              dict_facilities,
                              dict_linelist,
-                             dict_extra_vars) {
+                             dict_extra_vars,
+                             dict_vars_exclude) {
   
   ## requires
   library(dplyr)
@@ -25,7 +28,7 @@ import_linelists <- function(path_data_raw,
   ## scan and parse linelist files to identify the most recent linelist file to
   # import for each facility
   df_sheets <- scan_sheets(path_data_raw, country, dict_facilities)
-
+  
   ## derived columns
   cols_derive <- c("db_row",
                    "linelist_row",
@@ -54,12 +57,18 @@ import_linelists <- function(path_data_raw,
   
   ## columns to add (from original ll template)
   ll_template <- dict_linelist$code_name
+  ll_template <- ll_template[!grepl("^MSF_variable_additional", ll_template)]
   cols_to_add <- setdiff(ll_template, names(df_data))
   df_data[cols_to_add] <- NA_character_
   
   # check for new columns to be manually renamed
   extra_cols <- grep("^extra__", names(df_data), value = TRUE)
   new_cols <- setdiff(names(df_data), c(cols_derive, ll_template, extra_cols))
+  
+  # remove unnecessary columns
+  pref_exclude <- "^X0|^Añadir.el.nombre|^Ajouter.le.nom|^Add.variable.name|^MSF_variable_additional"
+  new_cols <- new_cols[!grepl(pref_exclude, new_cols)]
+  new_cols <- setdiff(new_cols, dict_vars_exclude[[1]])
   
   # arrange cols
   if (length(new_cols) > 0) {
@@ -101,15 +110,14 @@ scan_sheets <- function(path_data_raw,
 
   # regex patterns to remove from file path prior to parsing
   reg_rm <- "^linelist_Covid_anonymous__|_[[:digit:]]{2}-[[:digit:]]{2}\\.xlsb"
-  
+
   # variables to parse from file path
   vars_parse <- c("country",
                   "OC",
                   "project",
                   "site_type",
                   "site_name",
-                  "site_longitude",
-                  "site_latitude",
+                  "key",
                   "upload_date")
   
   ## prep dict_facilities for join
@@ -121,11 +129,11 @@ scan_sheets <- function(path_data_raw,
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
-    mutate(path_parse = gsub("lon_|lat_", "", path_parse)) %>%
+    mutate(path_parse = gsub("lon_.+_(?=2020)", "0000__", path_parse, perl = TRUE)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{2}") %>% 
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
     mutate(site_name_join = hmatch::string_std(site_name)) %>% 
-    select(-site_name, -project) %>% 
+    select(-site_name, -project, -key) %>% 
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
     select(-site_name_join) %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))

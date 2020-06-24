@@ -1,21 +1,28 @@
 #' Implement linelist cleaning routines
 #'
 #' @param dat Linelist data.frame
-#' @param path_cleaning Path to directory with data cleaning files
 #' @param path_dictionaries Path to directory with recoding dictionaries
+#' @param path_corrections_dates Path to directory with date corrections
+#' @param date_vars vector of date variables
 #' @param dict_factors Dictionary of allowed values for all factor variables
+#' @param dict_countries Dictionary of ISO3 country codes
+#' @param dict_numeric_correct Dictionary of corrections to numeric variables
+#' @param dict_factors_correct Dictionary of corrections to categorical variables
+#' @param dict_countries_correct Dictionary of corrections to ISO3 country variables
 #' @param write_checks Logical indicating whether check files should be written
-#'   (defaults to \code{TRUE})
 #'
 #' @return
 #' Cleaned linelist
 #' 
 clean_linelist <- function(dat,
-                           path_cleaning,
                            path_dictionaries,
+                           path_corrections_dates,
                            date_vars,
                            dict_factors,
                            dict_countries,
+                           dict_numeric_correct,
+                           dict_factors_correct,
+                           dict_countries_correct,
                            write_checks) {
 
   ## requires
@@ -28,27 +35,9 @@ clean_linelist <- function(dat,
 
   ## if running manually
   if (FALSE) {
-    dat <- dat_raw
+    dat <- ll_import
     write_checks <- TRUE
   }
-  
-  ## linelist language
-  lang <- switch(country,
-                 "CMR" = "fr",
-                 "COD" = "fr",
-                 "GIN" = "fr",
-                 "MLI" = "fr",
-                 "NER" = "fr",
-                 "HTI" = "fr",
-                 "CAF" = "fr",
-                 "BFA" = "fr",
-                 "MEX" = "es",
-                 "VEN" = "es",
-                 "en")
-  
-  ## read recoding dictionaries
-  dict_numeric_correct <- read_xlsx(file.path(path_dictionaries, "dict_numeric_correct.xlsx"))
-  dict_factors_correct <- read_xlsx(file.path(path_dictionaries, glue("dict_factors_correct_{lang}.xlsx")))
   
   
   #### Clean numeric variables -------------------------------------------------
@@ -70,7 +59,7 @@ clean_linelist <- function(dat,
   if (length(comcond_bad) > 0) {
     dat$Comcond_present <- comcond_n
     message("The following values of Comcond_present will be re-calculated: ",
-            paste(comcond_bad, collapse = "; "))
+            paste(unique(comcond_bad), collapse = "; "))
   }
   
   
@@ -119,12 +108,13 @@ clean_linelist <- function(dat,
   
   ## assemble dictionary for date variables
   check_files <- list_files(
-    path_cleaning,
-    pattern = glue::glue("dates_check_{country}_.*\\.xlsx"),
+    path_corrections_dates,
+    pattern = glue::glue("dates_check_compiled.*\\.xlsx"),
     full.names = TRUE
   )
   
-  dict_dates_full <- dplyr::bind_rows(lapply(check_files, check_files_to_dict))
+  dict_dates_full <- purrr::map_dfr(check_files, check_files_to_dict)
+  
   if (nrow(dict_dates_full) == 0) dict_dates_full <- create_empty_dict_dates()
   # TODO: fix problem with prev-changed vars getting ignore in new queries
   dict_dates_ignore <- filter(dict_dates_full, ignore)
@@ -139,7 +129,7 @@ clean_linelist <- function(dat,
     select(db_row, patient_id, all_of(date_vars)) %>%
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     arrange(db_row, patient_id) %>% 
-    mutate(date = parse_excel_dates(value),
+    mutate(date = suppressWarnings(parse_excel_dates(value)),
            date = parse_other_dates(date),
            date = as.Date(date))
   
@@ -179,16 +169,18 @@ clean_linelist <- function(dat,
   dat_date_flags <- dat_date %>%
     select(-value, -flag_ambiguous) %>%
     tidyr::spread(variable, date) %>% 
-    mutate(flag_upload_before_report = upload_date < report_date,
-           flag_report_before_onset = report_date < patcourse_dateonset,
-           flag_report_before_expo_travel = report_date < expo_travel_date1,
-           flag_report_before_expo_case = report_date < expo_case_date_first1,
-           flag_lab1_before_expo_travel = Lab_date1 < expo_travel_date1,
-           flag_lab1_before_expo_case = Lab_date1 < expo_case_date_first1,
-           flag_outcome_before_consult = outcome_date_of_outcome < MSF_date_consultation,
-           flag_outcome_before_lab1 = outcome_date_of_outcome < Lab_date1,
-           flag_submit_before_consult = outcome_submitted_date < MSF_date_consultation,
-           flag_submit_before_lab1 = outcome_submitted_date < Lab_date1) %>% 
+    mutate(
+      flag_upload_before_report = upload_date < report_date,
+      # flag_report_before_onset = report_date < patcourse_dateonset,
+      # flag_report_before_expo_travel = report_date < expo_travel_date1,
+      # flag_report_before_expo_case = report_date < expo_case_date_first1,
+      # flag_lab1_before_expo_travel = Lab_date1 < expo_travel_date1,
+      # flag_lab1_before_expo_case = Lab_date1 < expo_case_date_first1,
+      flag_outcome_before_consult = outcome_date_of_outcome < MSF_date_consultation,
+      # flag_outcome_before_lab1 = outcome_date_of_outcome < Lab_date1,
+      # flag_submit_before_consult = outcome_submitted_date < MSF_date_consultation,
+      # flag_submit_before_lab1 = outcome_submitted_date < Lab_date1
+    ) %>% 
     select(db_row, patient_id, starts_with("flag")) %>% 
     tidyr::gather(flag, value, -db_row, -patient_id) %>% 
     mutate(value = ifelse(!value, NA, value)) %>% 
@@ -201,7 +193,7 @@ clean_linelist <- function(dat,
   dates_check <- dat_date %>% 
     mutate(flag_future = ifelse(date > lubridate::today(), "flag_future", NA_character_),
            flag_too_early = ifelse(date < as.Date("2020-02-01"), "flag_too_early", NA_character_)) %>% 
-    left_join(dat_date_flags, by = c("db_row", "patient_id", "variable")) %>% 
+    left_join(dat_date_flags, by = c("db_row", "patient_id", "variable")) %>%
     tidyr::unite("flag", flag_ambiguous, flag_too_early, flag_future, flag, na.rm = TRUE, sep = "; ") %>% 
     mutate(flag = ifelse(flag == "", NA_character_, gsub("flag_", "", flag))) %>% 
     anti_join(dict_dates_ignore, by = c("patient_id", "variable", "flag")) %>% 
@@ -219,10 +211,10 @@ clean_linelist <- function(dat,
   ## check for non-missing values not converted to date
   if (nrow(dates_check) > 0 & write_checks) {
     
-    write_pretty_xlsx(
+    llct::write_simple_xlsx(
       dates_check,
-      file = file.path(path_cleaning, glue("dates_check_{country}_{time_stamp()}.xlsx")),
-      group_shade = "patient_id"
+      file = file.path(path_corrections_dates, glue("dates_check_compiled_{time_stamp()}.xlsx")),
+      group = patient_id
     )
     
     nambig <- sum(!is.na(dates_check$flag), na.rm = TRUE)
@@ -239,56 +231,155 @@ clean_linelist <- function(dat,
   
   #### Clean categorical variables ---------------------------------------------
   
-  ## recode variables using matchmaker::match_df()
-  dict_factors_prep <- dict_factors[,c("variable",
-                                       paste("values", lang, sep = "_"),
-                                       "values_en")] %>% 
-    setNames(c("var", "val", "val_en")) %>% 
-    mutate(val_clean = hmatch::string_std(val)) %>% 
-    select(val_clean, val, var, val_en)
+  dict_factors_long <- dict_factors %>% 
+    mutate(english = values_en) %>% 
+    pivot_longer(cols = starts_with("values"), names_to = "language") %>% 
+    mutate(language = stringr::str_sub(language, -2)) %>% 
+    arrange(language) %>% 
+    mutate(value_std = hmatch::string_std(value)) %>% 
+    select(value_std, value, variable, english, language)
   
   dat_factors_clean <- dat_dates_clean %>% 
+    mutate(language = tolower(stringr::str_sub(linelist_lang, 1, 2))) %>% 
     mutate_at(unique(dict_factors$variable), hmatch::string_std) %>% 
-    matchmaker::match_df(dictionary = dict_factors_prep) %>% 
-    matchmaker::match_df(dictionary = dict_factors_correct) %>% 
-    mutate(patcourse_ecmo = case_when(country == "MLI" & patcourse_ecmo == "Oui" ~ "Non"),
-           outcome_patcourse_ecmo = case_when(country == "MLI" & outcome_patcourse_ecmo == "Oui" ~ "Non"))
+    match_df_vec(dictionary = dict_factors_long, group = "language") %>% 
+    match_df_vec(dictionary = dict_factors_correct, group = "language")
   
-  ## test for non-valid country-code values
-  dict_countries_prep <- tidyr::expand_grid(
-    value = c(unique(dict_countries$iso), "Unknown"),
-    var = c("report_country",
-            "patinfo_idadmin0",
-            "patinfo_resadmin0",
-            "patinfo_occuhcw_country",
-            "expo_case_location",
-            "expo_travel_country1",
-            "expo_travel_country2",
-            "expo_travel_country3")
-  )
+  # Check for remaining non-valid values
+  check_categorical <- check_df_vec(dat_factors_clean,
+                                    dict_factors_long,
+                                    col_vals = 2,
+                                    col_vars = 3,
+                                    group = "language",
+                                    always_allow_na = TRUE,
+                                    return_allowed = TRUE,
+                                    nchar_allowed = 120)
   
-  nonvalid_iso <- matchmaker::check_df(dat_factors_clean,
-                                       dict_countries_prep,
-                                       always_allow_na = TRUE)
-  
-  ## test all other factors variables for nonvalid values
-  nonvalid <- matchmaker::check_df(dat_factors_clean,
-                                   dict_factors_prep,
-                                   col_vals = 2,
-                                   col_vars = 3,
-                                   always_allow_na = TRUE,
-                                   return_allowed = TRUE) %>% 
-    dplyr::bind_rows(nonvalid_iso)
-  
-  if (nrow(nonvalid) > 0) {
-    message("Some categorical variables contain nonvalid values:")
-    print(nonvalid)
+  if (nrow(check_categorical) > 0 & write_checks) {
+    
+    dict_factors_correct_write <- dict_factors_correct %>% 
+      mutate(new = NA_character_)
+    
+    dict_factors_out <- check_categorical %>% 
+      mutate(new = "Yes") %>% 
+      bind_rows(dict_factors_correct_write, .) %>% 
+      arrange(language, rev(new))
+    
+    llct::write_simple_xlsx(
+      dict_factors_out,
+      file = file.path(path_dictionaries, glue("dict_factors_correct.xlsx"))
+    )
+    
+    message(nrow(check_categorical), " new nonvalid values of categorical variables written to dict_factors_correct")
   }
   
-  ## translate to english
-  dat_factors <- dat_factors_clean %>% 
-    matchmaker::match_df(dictionary = dict_factors_prep, from = "val", to = "val_en")
+  ### Convert to English
+  dat_factors_english <- dat_factors_clean %>% 
+    match_df_vec(dictionary = dict_factors_long,
+                 from = "value",
+                 to = "english",
+                 by = "variable",
+                 group = "language") %>% 
+    select(-language)
   
-  ## return
-  return(dat_factors)
+  
+  #### Clean ISO3 country variables --------------------------------------------
+  vars_country <- c("report_country",
+                    "patinfo_idadmin0",
+                    "patinfo_resadmin0",
+                    "patinfo_occuhcw_country",
+                    "expo_case_location",
+                    "expo_travel_country1",
+                    "expo_travel_country2",
+                    "expo_travel_country3")
+  
+  dat_countries_clean <- dat_factors_english %>%
+    matchmaker::match_df(dict_countries_correct)
+  
+  check_countries <- llct::query(
+    dat_countries_clean, !.x %in% c(dict_countries$iso, NA_character_),
+    cond_cols = all_of(vars_country),
+    id_cols = country,
+    count = TRUE
+  ) %>% 
+    mutate(replacement1 = NA_character_) %>% 
+    select(value1, replacement1, variable1, country, n)
+  
+  # write to dict
+  if (nrow(check_countries) > 0 & write_checks) {
+    
+    dict_countries_correct_write <- dict_countries_correct %>% 
+      mutate(new = NA_character_)
+    
+    dict_countries_out <- check_countries %>% 
+      mutate(new = "Yes") %>% 
+      bind_rows(dict_countries_correct_write, .) %>% 
+      arrange(rev(new))
+    
+    llct::write_simple_xlsx(
+      dict_countries_out,
+      file = file.path(path_dictionaries, glue("dict_countries_correct.xlsx"))
+    )
+    
+    message(nrow(check_countries), " new nonvalid ISO3 country codes written to dict_countries_correct")
+  }
+  
+  
+  ### Calculate age in years
+  dat_countries_clean$age_in_years <- llct::age_to_years(
+    dat_countries_clean$patinfo_ageonset,
+    dat_countries_clean$patinfo_ageonsetunit
+  )
+  
+  
+  ### return
+  return(dat_countries_clean)
 }
+
+
+
+
+
+check_df_vec <- function(x,
+                         dictionary,
+                         col_vals = 1,
+                         col_vars = 2,
+                         group,
+                         always_allow_na,
+                         return_allowed = FALSE,
+                         sep_allowed = "; ",
+                         nchar_allowed = 60) {
+  
+  x_split <- split(x, x[[group]])
+  
+  dictionary_split <- split(dictionary, dictionary[[group]])
+  
+  purrr::map2_dfr(
+    x_split,
+    dictionary_split,
+    matchmaker::check_df,
+    col_vals = col_vals,
+    col_vars = col_vars,
+    always_allow_na = always_allow_na,
+    return_allowed = return_allowed,
+    sep_allowed = sep_allowed,
+    nchar_allowed = nchar_allowed,
+    .id = "language"
+  )
+}
+
+match_df_vec <- function(x, dictionary, from = 1, to = 2, by = 3, group) {
+  
+  x_split <- split(x, x[[group]])
+  
+  dictionary_split <- split(dictionary, dictionary[[group]])
+  
+  purrr::map2_dfr(
+    x_split,
+    dictionary_split,
+    matchmaker::match_df,
+    from = from,
+    to = to
+  )
+}
+

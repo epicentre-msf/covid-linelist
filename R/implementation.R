@@ -10,12 +10,6 @@ source("R/utilities.R")
 source("R/zzz.R")
 
 
-## list of countries
-country_dirs <- list.dirs(path_data_raw)
-country_dirs <- country_dirs[grepl("\\/[[:alpha:]]{3}$", country_dirs)]
-countries <- vapply(country_dirs, function(x) tail(strsplit(x, "/")[[1]], 1), "", USE.NAMES = FALSE)
-
-
 ### Read global ll
 ll_file <- list_files(
   path_export_global,
@@ -44,11 +38,13 @@ sheets <- lapply(countries,
   unnest("meta") %>% 
   mutate(upload_date = as.Date(upload_date)) %>% 
   group_by(site) %>% 
-  summarize(first_upload = min(upload_date),
-            latest_upload = max(upload_date),
-            language = unique(linelist_lang),
-            version = max(linelist_vers),
-            .groups = "drop")
+  summarize(
+    first_upload = min(upload_date),
+    latest_upload = max(upload_date),
+    language = unique(linelist_lang),
+    version = max(linelist_vers),
+    .groups = "drop"
+  )
 
 
 ### Proportion admin matchable
@@ -79,7 +75,7 @@ cutoff_date <- floor_date(today(), "week")
 ## Write
 library(openxlsx)
 
-wb <- write_pretty_xlsx(out, return_wb = TRUE)
+wb <- llct::write_simple_xlsx(out)
 
 red_bg <- createStyle(bgFill = "#FFC7CE")
 red_fg <- createStyle(fgFill = "#FFC7CE")

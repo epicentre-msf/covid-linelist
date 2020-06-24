@@ -1,33 +1,37 @@
 #' Implement linelist geocoding routines
 #'
-#' @param dat Linelist data.frame
-#' @param path_cleaning 
-#' @param path_shapefiles Path to directory with shapefiles
 #' @param country Country ISO code
+#' @param path_shapefiles Path to directory with shapefiles
+#' @param path_corrections_geocodes Path to directory with geocode corrections
 #' @param write_checks Logical indicating whether check files should be written
 #'   (defaults to \code{TRUE})
 #'
 #' @return
 #' Linelist with cleaned admin columns appended
 #'
-clean_geo <- function(dat,
-                      path_cleaning,
+clean_geo <- function(country,
                       path_shapefiles,
-                      country,
+                      path_corrections_geocodes,
                       write_checks) {
   
   ## requires
   library(dplyr)
+  library(tidyr)
   library(glue)
+  library(llct)
   library(janitor)
+  library(hmatch)
   source("R/geocode.R")
   source("R/utilities.R")
   
-  
   ## when running manually
   if (FALSE) {
-    dat <- dat_clean
+    country <- "AFG"
+    write_checks <- TRUE
   }
+  
+  ## read cleaned data
+  dat <- readRDS(glue("local/ll_covid_cleaned_{country}.rds"))
   
   ## shape
   shape <- unique(dat$shape)
@@ -39,12 +43,11 @@ clean_geo <- function(dat,
   dat_geoclean_prep <- dat %>% 
     tidyr::separate(MSF_admin_location_past_week,
                     into = adm_cols,
-                    sep = "[[:space:]]+\\|[[:space:]]+",
+                    sep = "[[:space:]]*\\|[[:space:]]*",
                     fill = "right",
                     remove = FALSE) %>% 
     select(all_of(col_order), matches("^adm[[:digit:]]_name"))
-  
-  
+
   ## geo reference file
   georef_file <- file.path(path_shapefiles,
                            shape,
@@ -56,7 +59,7 @@ clean_geo <- function(dat,
     df_geo_ref <- readRDS(georef_file)
     
     ## manual corrections
-    file_recode <- list_files(path_cleaning,
+    file_recode <- list_files(path_corrections_geocodes,
                               pattern = glue::glue("geocodes_recode_{shape}"),
                               full.names = TRUE,
                               last.sorted = TRUE)
@@ -67,19 +70,27 @@ clean_geo <- function(dat,
       NULL
     }
     
-    df_manual_check_full <- list_files(path_cleaning,
-                                       pattern = glue("geocodes_check_{shape}"),
-                                       full.names = TRUE) %>%
-      lapply(read_geo_manual) %>%
-      dplyr::bind_rows() %>%
-      mutate_all(as.character) %>% 
-      unique()
+    df_manual_check_full <- list_files(
+      path_corrections_geocodes,
+      pattern = glue("geocodes_check_{shape}"),
+      full.names = TRUE
+    ) %>%
+      purrr::map_dfr(readxl::read_xlsx, guess_max = 5000) %>%
+      mutate(across(where(is.logical), as.character))
     
-    df_geo_manual <- if (nrow(df_manual_check_full) && any(!is.na(df_manual_check_full$pcode))) {
-      filter(df_manual_check_full, !is.na(pcode))
-    } else {
-      NULL
+    if (nrow(df_manual_check_full) == 0) {
+      df_manual_check_full <- tibble(
+        adm1 = character(0),
+        adm2 = character(0),
+        adm3 = character(0),
+        adm4 = character(0),
+        pcode_new = character(0)
+      )
     }
+    
+    df_geo_manual <- df_manual_check_full %>% 
+      select(starts_with("adm"), pcode = pcode_new) %>% 
+      filter(!is.na(pcode))
     
     df_geo_raw <- dat_geoclean_prep %>% 
       select(matches("^adm[1234]_name")) %>% 
@@ -99,21 +110,9 @@ clean_geo <- function(dat,
     
     
     ## write file for manual correction
-    df_manual_check_full_join <- df_manual_check_full %>%
-      select(starts_with("adm"))
-    
-    if (nrow(df_manual_check_full_join) == 0) {
-      df_manual_check_full_join <- tibble(
-        adm1 = character(0),
-        adm2 = character(0),
-        adm3 = character(0),
-        adm4 = character(0)
-      )
-    }
-    
     out_check <- df_match_best %>% 
       janitor::remove_empty("rows") %>% 
-      anti_join(df_manual_check_full_join, by = raw_names) %>%
+      anti_join(df_manual_check_full, by = raw_names) %>%
       filter(is.na(match_type) | grepl("best", match_type)) %>% 
       mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
              level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
@@ -121,13 +120,27 @@ clean_geo <- function(dat,
       mutate(pcode_new = NA_character_, comment = NA_character_)
     
     if (write_checks & nrow(out_check) > 0) {
-      file_out <- glue("geocodes_check_{shape}_{time_stamp()}.xlsx")
-      write_pretty_xlsx(out_check,
-                        file = file.path(path_cleaning, file_out),
-                        group_shade = "level_ref", zoom = 145)
+      
+      dict_geo_correct_write <- df_manual_check_full %>% 
+        select(-any_of("i")) %>% 
+        mutate(new = NA_character_)
+      
+      dict_geo_out <- out_check %>% 
+        mutate(new = "Yes") %>%
+        bind_rows(dict_geo_correct_write, .) %>% 
+        distinct(adm1, adm2, adm3, adm4, .keep_all = TRUE)
+        arrange(level_raw, level_ref)
+      
+      file_out <- glue::glue("geocodes_check_{shape}.xlsx")
+      
+      llct::write_simple_xlsx(
+        dict_geo_out,
+        file = file.path(path_corrections_geocodes, file_out),
+        group = level_raw
+      )
+      
+      message(nrow(out_check), " new ambiguous geocode(s) written to ", file_out)
     }
-    
-    message(nrow(out_check), " new ambiguous geocodes found")
     
     pcode_bind <- df_match_best %>% 
       filter(!is.na(pcode)) %>% 
@@ -162,25 +175,6 @@ clean_geo <- function(dat,
       setNames(gsub("__res_ref$", "__res", names(.))) %>% 
       setNames(gsub("_pcode$", "_pcode__res", names(.))) %>% 
       arrange(db_row)
-    
-    # ## check patinfo_idadmin0/patinfo_idadmin1
-    # dat %>% 
-    #   filter(patinfo_idadmin1 == "North east")
-    # 
-    # raw <- dat %>% 
-    #   select(patinfo_idadmin0, patinfo_idadmin1) %>% 
-    #   filter(!is.na(patinfo_idadmin1)) %>% 
-    #   unique()
-    # 
-    # ref_prep <- df_geo_ref %>% 
-    #   filter(level == 1) %>% 
-    #   mutate(adm0 = country) %>% 
-    #   select(adm0, adm1)
-    # 
-    # hmatch(raw,
-    #        ref_prep,
-    #        by = c("patinfo_idadmin0", "patinfo_idadmin1"),
-    #        by_ref = c("adm0", "adm1"))
     
   } else {
     
