@@ -1,4 +1,14 @@
 
+bind_query_list <- function(...,
+                            .id = "query_id",
+                            cols_arrange = c("query_id",
+                                             "site",
+                                             "MSF_N_Patient",
+                                             "linelist_row")) {
+  out <- dplyr::bind_rows(..., .id = .id)
+  dplyr::arrange(out, dplyr::across(all_of(cols_arrange)))
+}
+
 
 write_by_country <- function(x, dat, path_prefix = "local/ll_covid_raw_") {
   dat_write <- dat[dat$country == x,]
@@ -17,17 +27,31 @@ is_excel_numeric <- function(x) {
 parse_excel_dates <- function(x) {
   # parse character string consisting of R date (YYYY-MM-DD) OR excel date
   #  (NNNNN); output will be character in "YYYY-MM-DD" format
-  library(janitor)
-  ifelse(is_excel_numeric(x),
-         as.character(suppressWarnings(janitor::excel_numeric_to_date(as.integer(x)))),
-         x)
+  x <- as.character(x)
+  i <- is_excel_numeric(x)
+  x[i] <- as.character(janitor::excel_numeric_to_date(as_integer_quiet(x[i])))
+  x
 }
 
 
 parse_other_dates <- function(x, order = c("%d/%m/%Y", "%Y-%m-%d")) {
-  dplyr::if_else(grepl("\\/", x), # if other date format
-                 as.character(suppressWarnings(lubridate::parse_date_time(x, order = order))),
-                 x)
+  x <- as.character(x)
+  i <- grepl("\\/", x)
+  x[i] <- as.character(lubridate::parse_date_time(x[i], order = order))
+  x
+}
+
+
+parse_dates <- function(x) {
+  x <- as.character(x)
+  x <- parse_excel_dates(x)
+  x <- parse_other_dates(x)
+  suppressWarnings(lubridate::as_date(x))
+}
+
+non_valid_date <- function(x) {
+  x_date <- parse_dates(x)
+  !is.na(x) & is.na(x_date)
 }
 
 
