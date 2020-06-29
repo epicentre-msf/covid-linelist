@@ -1,4 +1,27 @@
 
+test_set_equal <- function(x, allowed, to.lower = TRUE) {
+  
+  var <- deparse(substitute(x))
+  var <- gsub("^.*\\$", "", var)
+  
+  if (to.lower) {
+    x <- tolower(x)
+    allowed <- tolower(allowed)
+  }
+  
+  nonvalid <- rev(setdiff(x, allowed))
+  nonvalid[!is.na(nonvalid)] <- dQuote(nonvalid[!is.na(nonvalid)], q = FALSE)
+  
+  if (length(nonvalid) > 0) {
+    warning(
+      var, " includes unexpected values: ",
+      paste0("c(", paste(nonvalid, collapse = ", "), ")"),
+      call. = FALSE
+    )
+  }
+}
+
+
 bind_query_list <- function(...,
                             .id = "query_id",
                             cols_arrange = c("query_id",

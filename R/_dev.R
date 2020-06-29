@@ -2,7 +2,6 @@
 ### Required libraries, paths, and global dictionaries
 source("R/zzz.R")
 source("R/import.R")
-source("R/import_yem.R")
 source("R/clean.R")
 source("R/geocode.R")
 
@@ -15,7 +14,15 @@ source("R/geocode.R")
 countries_update <- countries
 
 
-### Import raw linelists
+### Import non-Epicentre linelists
+source("R/import_other_afg.R")
+source("R/import_other_yem.R")
+
+ll_other_afg <- import_other_afg(path_linelist_other)
+ll_other_yem <- import_other_yem(path_linelist_other)
+
+
+### Import Epicentre-version linelists
 ll_import <- purrr::map_dfr(countries_update,
                             import_linelists,
                             path_data_raw = path_data_raw,
@@ -23,7 +30,7 @@ ll_import <- purrr::map_dfr(countries_update,
                             dict_linelist = dict_linelist,
                             dict_extra_vars = dict_extra_vars,
                             dict_vars_exclude = dict_vars_exclude) %>% 
-  bind_rows(import_yem(path_linelist_other))
+  dplyr::bind_rows(ll_other_afg, ll_other_yem)
 
 
 # check for missing site or MSF_N_Patient
@@ -100,6 +107,7 @@ d_global <- list.files("local", pattern = "msf_covid19_linelist", full.names = T
   rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
   mutate(db_row = 1:n())
 
+
 # double-check for allowed values
 matchmaker::check_df(
   d_global,
@@ -108,6 +116,8 @@ matchmaker::check_df(
   col_vars = "variable",
   always_allow_na = TRUE
 )
+
+
 
 
 if (FALSE) {
@@ -132,13 +142,14 @@ d_global_his <- d_global %>%
 OC_list <- unique(d_global$OC)
 
 
+
 if (FALSE) {
   for (OC_focal in OC_list) {
     file_out_oc <- glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
     
     # HIS-export
     d_oc_his <- filter(d_global_his, OC == OC_focal)
-    if (OC_focal == "OCBA") { d_oc_his$age_in_years <- as.integer(round(d_oc_his$age_in_years, 0)) }
+    # if (OC_focal == "OCBA") { d_oc_his$age_in_years <- as.integer(round(d_oc_his$age_in_years, 0)) }
     path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
     llct::write_simple_xlsx(d_oc_his, path_out1_oc)
     
@@ -148,3 +159,5 @@ if (FALSE) {
     llct::write_simple_xlsx(d_oc_foc, path_out2_oc)
   }
 }
+
+

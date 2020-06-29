@@ -11,13 +11,12 @@
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_yem <- function(path_linelist_other) {
+import_other_yem <- function(path_linelist_other) {
   
   ## requires
   library(dplyr)
   library(hmatch)
-  # source("R/import.R")
-  source("R/import_yem.R")
+  source("R/import_other_yem.R")
   
   file_sana <- list_files(file.path(path_linelist_other, "YEM"), pattern = "Sana", full.names = TRUE, last.sorted = TRUE)
   file_aden <- list_files(file.path(path_linelist_other, "YEM"), pattern = "Aden", full.names = TRUE, last.sorted = TRUE)
@@ -128,11 +127,6 @@ import_yem <- function(path_linelist_other) {
   # check for new columns to be manually renamed
   extra_cols <- grep("^extra__", names(df_data), value = TRUE)
   new_cols <- setdiff(names(df_data), c(cols_derive, ll_template, extra_cols))
-  
-  # # arrange cols
-  # if (length(new_cols) > 0) {
-  #   message("New linelist columns to rename:\n", paste(new_cols, collapse = "\n"))
-  # }
   
   ## return
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
