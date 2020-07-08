@@ -33,7 +33,7 @@ bind_query_list <- function(...,
 }
 
 
-write_by_country <- function(x, dat, path_prefix = "local/ll_covid_raw_") {
+write_by_country <- function(x, dat, path_prefix = "local/raw/ll_covid_raw_") {
   dat_write <- dat[dat$country == x,]
   path_write <- paste0(path_prefix, x, ".rds")
   saveRDS(dat_write, path_write)
@@ -57,7 +57,7 @@ parse_excel_dates <- function(x) {
 }
 
 
-parse_other_dates <- function(x, order = c("%d/%m/%Y", "%Y-%m-%d")) {
+parse_other_dates <- function(x, order = c("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d")) {
   x <- as.character(x)
   i <- grepl("\\/", x)
   x[i] <- as.character(lubridate::parse_date_time(x[i], order = order))
@@ -98,14 +98,38 @@ max_safe <- function(x) {
 
 get_site_meta <- function(file_path) {
   
-  df <- readxlsb::read_xlsb(
-    file_path,
-    sheet = "options",
-    col_types = "string"
+  df <- try(
+    readxl::read_xlsx(
+      file_path,
+      sheet = "Options",
+      col_types = "text"
+    ),
+    silent = TRUE
   )
   
-  language <- df$value[df$variable == "language"]
-  version <- df$value[df$variable == "version"]
+  if ("try-error" %in% class(df)) {
+    
+    ll <- readxl::read_xlsx(
+      file_path,
+      sheet = "linelist",
+      col_types = "text"
+    )
+    
+    # if no Options tab, find linelist language the hardcore way
+    language_counts <- c(
+      English = sum(ll == "Yes", na.rm = TRUE),
+      Français = sum(ll == "Oui", na.rm = TRUE),
+      Espagnol = sum(ll == "Si", na.rm = TRUE),
+      Portuguese = sum(ll == "Sim", na.rm = TRUE)
+    )
+    
+    language <- names(which.max(language_counts))
+    version <- "Other"
+    
+  } else {
+    language <- df$value[df$variable == "language"]
+    version <- df$value[df$variable == "version"]
+  }
   
   return(tibble::tibble(linelist_lang = language, linelist_vers = version))
 }
@@ -234,30 +258,6 @@ is_posix <- function(x) {
 }
 
 
-list_files <- function(path = ".", pattern = NULL, full.names = FALSE,
-                       ignore.case = FALSE, ignore.temp = TRUE,
-                       last.sorted = FALSE) {
-  # convenience version of list.files to find files within a directory while
-  #  ignoring temporary files (which on some systems begin with "~$")
-  # if pattern matches multiple files differing only in their time stamps, arg
-  #  last.sorted allows user to retain only the most recent file
-  files <- list.files(path = path, pattern = pattern)
-  if (ignore.temp) {
-    # remove temporary files (negative look-behind for "~$" before 'pattern')
-    files <- grep(paste0("(?<!\\~\\$)", pattern), files,
-                  ignore.case = ignore.case, value = TRUE, perl = TRUE)
-  }
-  if (last.sorted) {
-    # select only the last-sorted file
-    files <- tail(sort(files), 1)
-  }
-  if (full.names) {
-    files <- file.path(path, files)
-  }
-  files
-}
-
-
 list_dirs <- function(path = ".", pattern = NULL) {
   x <- list.dirs(path)
   if (!is.null(pattern)) x <- x[grepl(pattern, x)]
@@ -311,18 +311,73 @@ get_date_differences <- function(x, col) {
 }
 
 
+
+query_recode <- c(
+  "i" = "i",
+  "Query group" = "query_group",
+  "Query #" = "query_number",
+  "OC" = "OC",
+  "Country" = "country",
+  "Site" = "site",
+  "Upload date" = "upload_date",
+  "# Patient" = "MSF_N_Patient",
+  "Row (export)" = "linelist_row",
+  "Query category" = "category",
+  "Query ID" = "query_id",
+  "Description" = "description",
+  "Variable 1" = "variable1",
+  "Value 1" = "value1",
+  "Variable 2" = "variable2",
+  "Value 2" = "value2",
+  "Date query generated" = "date_generated",
+  "Resolved (auto)" = "resolved_auto",
+  "Date resolved (auto)" = "date_resolved_auto",
+  "Resolved (field)" = "resolved_field",
+  "Date resolved (field)" = "date_resolved_field",
+  "Comment (field)" = "comment"
+)
+
+query_recode_inv <- setNames(names(query_recode), query_recode)
+
+
+
 write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   
   if (!is.null(site_focal)) {
     queries_out <- queries_out %>% 
-      filter(site == site_focal)
+      filter(site %in% site_focal)
   }
   
+  queries_resolved <- queries_out %>% 
+    filter(resolved_auto == "Yes") %>% 
+    mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
+  
+  queries_outstanding <- queries_out %>% 
+    filter(resolved_auto == "No") %>% 
+    mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
+  
   queries_summary <- queries_out %>% 
-    group_by(category, query_id, description) %>% 
+    group_by(category, query_id, resolved_auto, description) %>% 
     summarize(n_total = n(), .groups = "drop") %>% 
-    arrange(desc(n_total)) %>% 
-    select(Category = category, `Query ID` = query_id, `N (Total)` = n_total, Description = description)
+    tidyr::pivot_wider(names_from = "resolved_auto", values_from = "n_total", values_fill = 0)
+  
+  if (!"Yes" %in% names(queries_summary)) {
+    queries_summary$Yes <- 0L
+  }
+  
+  if (!"No" %in% names(queries_summary)) {
+    queries_summary$No <- 0L
+  }
+  
+  queries_summary <- queries_summary %>% 
+    mutate(total = Yes + No) %>% 
+    arrange(desc(total)) %>% 
+    select(Category = category,
+           `Query ID` = query_id,
+           `N Total` = total,
+           `N Resolved` = Yes,
+           `N Outstanding` = No,
+           Description = description)
   
   header_recode <- c(
     "i" = "i",
@@ -349,35 +404,57 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
     "Comment (field)" = "comment"
   )
   
-  queries_out <- queries_out %>% 
+  
+  queries_outstanding <- queries_outstanding %>% 
     rename(!!!header_recode)
+  
+  queries_resolved <- queries_resolved %>% 
+    rename(!!!header_recode)
+  
   
   ## Write updated query tracker sheets to file
   library(openxlsx)
   options("openxlsx.dateFormat" = "yyyy-mm-dd")
   wb <- openxlsx::createWorkbook()
-  openxlsx::addWorksheet(wb, "Queries", zoom = 130)
   hs <- openxlsx::createStyle(halign = "center", textDecoration = "Bold")
+  la <- openxlsx::createStyle(halign = "left")
   
   # sheet 1 (Main query tracker)
-  openxlsx::writeData(wb, 1, queries_out, withFilter = TRUE)
-  openxlsx::setColWidths(wb, 1, cols = 1:ncol(queries_out),
+  openxlsx::addWorksheet(wb, "Current", zoom = 130)
+  openxlsx::writeData(wb, 1, queries_outstanding, withFilter = TRUE)
+  openxlsx::setColWidths(wb, 1, cols = 1:ncol(queries_outstanding),
                          widths = c(6, 15, 14, 10, 12, 13, 15, 20, 15, 20, 15, 100, 40, 30, 40, 30, 22, 17, 22, 17, 22, 70))
   openxlsx::freezePane(wb, 1, firstActiveRow = 2)
-  openxlsx::addStyle(wb, 1, style = hs, rows = 1, cols = 1:ncol(queries_out), gridExpand = TRUE)
+  openxlsx::addStyle(wb, 1, style = hs, rows = 1, cols = 1:ncol(queries_outstanding), gridExpand = TRUE)
+  openxlsx::addStyle(wb, 1, style = la, rows = 2:(nrow(queries_outstanding) + 1L), cols = 1:ncol(queries_outstanding), gridExpand = TRUE)
   openxlsx::conditionalFormatting(wb, 1,
-                                  cols = 1:ncol(queries_out),
-                                  rows = 2:(nrow(queries_out) + 1L),
+                                  cols = 1:ncol(queries_outstanding),
+                                  rows = 2:(nrow(queries_outstanding) + 1L),
                                   rule = paste0("$A2>0"),
                                   style = openxlsx::createStyle(bgFill = "#fddbc7"))
   
-  # sheet 2 (summary)
-  openxlsx::addWorksheet(wb, "Summary", zoom = 130)
-  openxlsx::writeData(wb, 2, queries_summary)
+  # sheet 2 (Resolved queries)
+  openxlsx::addWorksheet(wb, "Resolved", zoom = 130)
+  openxlsx::writeData(wb, 2, queries_resolved, withFilter = TRUE)
+  openxlsx::setColWidths(wb, 2, cols = 1:ncol(queries_resolved),
+                         widths = c(6, 15, 14, 10, 12, 13, 15, 20, 15, 20, 15, 100, 40, 30, 40, 30, 22, 17, 22, 17, 22, 70))
   openxlsx::freezePane(wb, 2, firstActiveRow = 2)
-  openxlsx::addStyle(wb, 2, style = hs, rows = 1, cols = 1:ncol(queries_summary), gridExpand = TRUE)
-  openxlsx::setColWidths(wb, 2, cols = 1:ncol(queries_summary),
-                         widths = c(21, 14, 10, 110))
+  openxlsx::addStyle(wb, 2, style = hs, rows = 1, cols = 1:ncol(queries_resolved), gridExpand = TRUE)
+  openxlsx::addStyle(wb, 2, style = la, rows = 2:(nrow(queries_resolved) + 1L), cols = 1:ncol(queries_resolved), gridExpand = TRUE)
+  openxlsx::conditionalFormatting(wb, 2,
+                                  cols = 1:ncol(queries_resolved),
+                                  rows = 2:(nrow(queries_resolved) + 1L),
+                                  rule = paste0("$A2>0"),
+                                  style = openxlsx::createStyle(bgFill = "#fddbc7"))
+  
+  # sheet 3 (summary)
+  openxlsx::addWorksheet(wb, "Summary", zoom = 130)
+  openxlsx::writeData(wb, 3, queries_summary)
+  openxlsx::freezePane(wb, 3, firstActiveRow = 2)
+  openxlsx::addStyle(wb, 3, style = hs, rows = 1, cols = 1:ncol(queries_summary), gridExpand = TRUE)
+  openxlsx::addStyle(wb, 3, style = la, rows = 2:(nrow(queries_summary) + 1L), cols = 1:ncol(queries_summary), gridExpand = TRUE)
+  openxlsx::setColWidths(wb, 3, cols = 1:ncol(queries_summary),
+                         widths = c(21, 14, 12, 12, 12, 110))
   
   suppressMessages(
     openxlsx::saveWorkbook(
@@ -389,7 +466,13 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
 }
 
 
-write_query_tracker_site <- function(queries_out) {
+
+
+write_query_tracker_site <- function(queries_out, OC_focal) {
+  
+  if (!missing(OC_focal)) {
+    queries_out <- filter(queries_out, OC %in% OC_focal)
+  }
   
   paths_oc_site <- distinct(queries_out, OC, site) %>% 
     arrange(OC, site) %>% 
@@ -406,4 +489,67 @@ write_query_tracker_site <- function(queries_out) {
                         path = paths_oc_site$path_file[i])
   }
 }
+
+
+
+
+
+guess_language <- function(ll) {
+  
+  ll <- dplyr::mutate_all(ll, ~tolower(as.character(.x)))
+  
+  language_counts <- c(
+    en = sum(ll == "yes", na.rm = TRUE),
+    fr = sum(ll == "oui", na.rm = TRUE),
+    es = sum(ll == "si",  na.rm = TRUE),
+    pt = sum(ll == "sim", na.rm = TRUE) 
+  )
+  
+  names(which.max(language_counts))
+}
+
+
+
+
+
+
+
+prep_query_group_int <- function(d, group_start) {
+  
+  out <- d %>% 
+    arrange(site, query_id, MSF_N_Patient) %>% 
+    group_by(site) %>% 
+    mutate(query_group_int = paste(query_id, MSF_N_Patient, linelist_row),
+           query_group_int = integer_id(query_group_int)) %>% 
+    ungroup()
+  
+  if (!missing(group_start)) {
+    out$query_group_int <- out$query_group_int + out[[group_start]] - 1L
+  }
+  
+  return(out)
+}
+
+format_query_group <- function(x) {
+  paste0("Q", formatC(x, width = 5, flag = "0"))
+}
+
+prep_query_number_int <- function(d, number_start) {
+  
+  out <- d %>% 
+    group_by(site, query_group) %>% 
+    mutate(query_number_int = 1:n()) %>% 
+    ungroup()
+  
+  if (!missing(number_start)) {
+    out$query_number_int <- out$query_number_int + out[[number_start]] - 1L
+  }
+  
+  return(out)
+}
+
+format_query_number <- function(x) {
+  formatC(x, width = 3, flag = "0")
+}
+
 

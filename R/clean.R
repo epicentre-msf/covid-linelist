@@ -31,6 +31,7 @@ clean_linelist <- function(dat,
   library(glue)
   library(repi)
   library(matchmaker)
+  source("R/clean.R")
   source("R/utilities.R")
 
   ## if running manually
@@ -39,6 +40,16 @@ clean_linelist <- function(dat,
     write_checks <- TRUE
   }
   
+  #### Create temporary IDs if otherwise missing -------------------------------
+  dat <- dat %>% 
+    group_by(site) %>% 
+    mutate(temp_MSF_N_Patient = paste0("TEMPID_", formatC(1:n(), width = 3, flag = "0")),
+           temp_patient_id = paste(site, format_text(temp_MSF_N_Patient), sep = "_")) %>% 
+    ungroup() %>% 
+    mutate(temp_update_ids = is.na(MSF_N_Patient)) %>% 
+    mutate(MSF_N_Patient = ifelse(temp_update_ids, temp_MSF_N_Patient, MSF_N_Patient),
+           patient_id = ifelse(temp_update_ids, temp_patient_id, patient_id)) %>% 
+    select(-temp_update_ids, -temp_MSF_N_Patient, -temp_patient_id)
   
   #### Clean numeric variables -------------------------------------------------
   
@@ -46,11 +57,11 @@ clean_linelist <- function(dat,
   comcond_n <- dat %>% 
     select(starts_with("Comcond"), -Comcond_present) %>% 
     mutate(Comcond_other = ifelse(!is.na(Comcond_other), "Yes", NA_character_)) %>% 
-    apply(1, function(x) as.character(sum(tolower(x) %in% c('yes', 'oui', 'si') & !is.na(x), na.rm = TRUE)))
+    apply(1, function(x) as.character(sum(tolower(x) %in% c('yes', 'oui', 'si', 'sim') & !is.na(x), na.rm = TRUE)))
   
   comcond_missing <- dat %>% 
     select(starts_with("Comcond"), -Comcond_present) %>% 
-    apply(1, function(x) all(tolower(x) %in% c('unknown', 'inconnu', 'no conocido') | is.na(x)))
+    apply(1, function(x) all(tolower(x) %in% c('unknown', 'inconnu', 'no conocido', 'desconhecido') | is.na(x)))
   
   comcond_n[comcond_missing] <- NA_character_
   
@@ -89,12 +100,25 @@ clean_linelist <- function(dat,
   
   ## check for non-missing values not converted to numeric
   if (any(dat_numeric$flag)) {
-    message("Values of numeric variables could not be coerced to numeric:")
-    dat_numeric %>%
+
+    check_numeric_append <- dat_numeric %>%
       filter(flag) %>% 
       select(patient_id, variable, value) %>% 
-      mutate(replace = NA_character_) %>% 
-      print(n = 100)
+      mutate(replacement = NA_character_, new = "Yes")
+    
+    dict_numeric_correct_out <- dict_numeric_correct %>% 
+      mutate(new = NA_character_) %>% 
+      bind_rows(check_numeric_append)
+    
+    llct::write_simple_xlsx(
+      dict_numeric_correct_out,
+      file = file.path(path_dictionaries, glue("dict_numeric_correct.xlsx"))
+    )
+    
+    message(
+      nrow(check_numeric_append),
+      " new nonvalid values of numerical variables written to dict_numeric_correct"
+    )
   }
   
   ## merge cleaned numeric columns back into dat_numeric
@@ -107,9 +131,9 @@ clean_linelist <- function(dat,
   #### Clean date variables ----------------------------------------------------
   
   ## assemble dictionary for date variables
-  check_files <- list_files(
+  check_files <- list.files(
     path_corrections_dates,
-    pattern = glue::glue("dates_check_compiled.*\\.xlsx"),
+    pattern = "dates_check_compiled.*\\.xlsx",
     full.names = TRUE
   )
   
@@ -204,7 +228,10 @@ clean_linelist <- function(dat,
     select(-check) %>% 
     filter(!is.na(value) | !is.na(date)) %>% 
     arrange(db_row, date) %>% 
-    mutate(date_correct = NA_character_, comment = NA_character_) %>% 
+    mutate(date = as.character(date),
+           date_correct = NA_character_,
+           comment = NA_character_) %>% 
+    mutate(date_correct = ifelse(flag == "ambiguous", ".na", NA_character_)) %>% 
     select(patient_id, variable, value, date, date_correct, flag, comment)
   
 
@@ -218,7 +245,7 @@ clean_linelist <- function(dat,
     )
     
     nambig <- sum(!is.na(dates_check$flag), na.rm = TRUE)
-    message(paste(nambig, "ambiguous dates written to file"))
+    message(paste(nambig, "date problems written to file"))
   }
   
   
@@ -241,6 +268,7 @@ clean_linelist <- function(dat,
   
   dat_factors_clean <- dat_dates_clean %>% 
     mutate(language = tolower(stringr::str_sub(linelist_lang, 1, 2))) %>% 
+    mutate(language = recode(language, "po" = "pt")) %>% 
     mutate_at(unique(dict_factors$variable), hmatch::string_std) %>% 
     match_df_vec(dictionary = dict_factors_long, group = "language") %>% 
     match_df_vec(dictionary = dict_factors_correct, group = "language")
@@ -253,7 +281,10 @@ clean_linelist <- function(dat,
                                     group = "language",
                                     always_allow_na = TRUE,
                                     return_allowed = TRUE,
-                                    nchar_allowed = 120)
+                                    nchar_allowed = 120) %>% 
+    as_tibble()
+
+  
   
   if (nrow(check_categorical) > 0 & write_checks) {
     
@@ -298,8 +329,8 @@ clean_linelist <- function(dat,
   
   check_countries <- llct::query(
     dat_countries_clean, !.x %in% c(dict_countries$iso, NA_character_),
-    cond_cols = all_of(vars_country),
-    id_cols = country,
+    cols_cond = all_of(vars_country),
+    cols_base = country,
     count = TRUE
   ) %>% 
     mutate(replacement1 = NA_character_) %>% 
@@ -352,7 +383,9 @@ check_df_vec <- function(x,
   
   x_split <- split(x, x[[group]])
   
-  dictionary_split <- split(dictionary, dictionary[[group]])
+  groups_match <- names(x_split)
+  dictionary_split <- purrr::map(groups_match, ~ filter(dictionary, !!ensym(group) == .x))
+  names(dictionary_split) <- groups_match
   
   purrr::map2_dfr(
     x_split,
@@ -368,11 +401,14 @@ check_df_vec <- function(x,
   )
 }
 
+
+
 match_df_vec <- function(x, dictionary, from = 1, to = 2, by = 3, group) {
   
   x_split <- split(x, x[[group]])
-  
-  dictionary_split <- split(dictionary, dictionary[[group]])
+  groups_match <- names(x_split)
+  dictionary_split <- purrr::map(groups_match, ~ filter(dictionary, !!ensym(group) == .x))
+  names(dictionary_split) <- groups_match
   
   purrr::map2_dfr(
     x_split,

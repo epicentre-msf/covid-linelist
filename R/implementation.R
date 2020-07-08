@@ -10,12 +10,12 @@ source("R/utilities.R")
 source("R/zzz.R")
 
 
-### Read global ll
-ll_file <- list_files(
+### Read latest global ll
+ll_file <- llu::list_files(
   path_export_global,
   pattern = "msf_covid19_.*\\.rds",
-  last.sorted = TRUE,
-  full.names = TRUE
+  full.names = TRUE,
+  select = "latest"
 )
 
 dat <- readRDS(ll_file)
@@ -28,12 +28,11 @@ geobase <- list.files(path_geobase, pattern = "xlsx") %>%
 
 
 ### Linelist language and version
-sheets <- lapply(countries,
-                 scan_sheets,
-                 path_data_raw = path_data_raw,
-                 dict_facilities = dict_facilities,
-                 return_latest = FALSE) %>% 
-  dplyr::bind_rows() %>% 
+sheets <- purrr::map_dfr(countries,
+                         scan_sheets,
+                         path_data_raw = path_data_raw,
+                         dict_facilities = dict_facilities,
+                         return_latest = FALSE) %>% 
   mutate(meta = map(file_path, get_site_meta)) %>% 
   unnest("meta") %>% 
   mutate(upload_date = as.Date(upload_date)) %>% 
@@ -65,6 +64,7 @@ out <- dict_facilities %>%
   left_join(sheets, by = "site") %>% 
   left_join(dat_summary, by = "site") %>% 
   arrange(site) %>% 
+  mutate(across(where(is.Date), as.character)) %>% 
   select(country, OC, project, site_name, site_code = site, site_type, version, language, first_upload, latest_upload, everything())
 
 

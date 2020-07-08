@@ -11,31 +11,68 @@ source("R/geocode.R")
 # geo-match, and write resulting cleaned linelist files
 
 # focal country ISO code
-countries_update <- countries
-
+countries_update <- setdiff(countries, "TCD")
 
 ### Import non-Epicentre linelists
-source("R/import_other_afg.R")
-source("R/import_other_yem.R")
+source("R/import_other_afg_tri.R")
+source("R/import_other_yem_ocp.R")
+source("R/import_other_yem_pra.R")
+source("R/import_other_yem_moh.R")
+source("R/import_other_cod_oca.R")
+source("R/import_other_hti_ocb.R")
+source("R/import_other_ssd_ocg.R") # temp solution
 
-ll_other_afg <- import_other_afg(path_linelist_other)
-ll_other_yem <- import_other_yem(path_linelist_other)
+
+
+ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
+ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
+ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
+ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
+ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
+ll_other_ssd_ocg <- import_other_ssd_ocg(path_linelist_other, dict_linelist)
+# ll_other_yem_moh <- import_other_yem_moh(path_linelist_other, dict_linelist)
 
 
 ### Import Epicentre-version linelists
-ll_import <- purrr::map_dfr(countries_update,
-                            import_linelists,
-                            path_data_raw = path_data_raw,
-                            dict_facilities = dict_facilities,
-                            dict_linelist = dict_linelist,
-                            dict_extra_vars = dict_extra_vars,
-                            dict_vars_exclude = dict_vars_exclude) %>% 
-  dplyr::bind_rows(ll_other_afg, ll_other_yem)
+ll_import_epicentre <- purrr::map_dfr(
+  countries_update,
+  import_linelists,
+  path_data_raw = path_data_raw,
+  dict_facilities = dict_facilities,
+  dict_linelist = dict_linelist,
+  dict_extra_vars = dict_extra_vars,
+  dict_vars_exclude = dict_vars_exclude
+)
 
 
-# check for missing site or MSF_N_Patient
-llct::query(ll_import, is.na(site), id_cols = c(country, OC), count = TRUE)
-llct::query(ll_import, is.na(MSF_N_Patient), id_cols = c(country, OC), count = TRUE)
+### Bind Epicentre and Other imports
+ll_import <- dplyr::bind_rows(
+  ll_import_epicentre,
+  ll_other_afg_tri,
+  ll_other_yem_ocp,
+  ll_other_yem_pra,
+  ll_other_cod_oca,
+  ll_other_hti_ocb,
+  ll_other_ssd_ocg
+)
+
+
+# check for missing values among important columns
+queryr::query(
+  ll_import,
+  is.na(.x),
+  cols_dotx = c(
+    "MSF_N_Patient",
+    "site",
+    "patient_id",
+    "linelist_lang",
+    "upload_date",
+    "country",
+    "shape"
+  ),
+  cols_base = c(country, OC)
+)
+
 
 
 # save raw country-specific RDS files
@@ -45,10 +82,19 @@ purrr::walk(
   dat = ll_import
 )
 
+
+
 ### Implement cleaning routines
 ll_cleaned <- ll_import %>% 
-  filter(site != "ETH_E_GRH") %>% 
-  filter(!is.na(MSF_N_Patient)) %>% 
+  # temp solution for ETH_E_GRH to remove names (will be replace with TEMP_001, ...)
+  mutate(MSF_N_Patient = ifelse(site == "ETH_E_GRH", NA_character_, MSF_N_Patient)) %>%
+  # temp solution for AFG_P_GZG to fix expo_contact_case
+  mutate(expo_contact_case = 
+    case_when(
+      site == "AFG_P_GZG" & is.na(expo_contact_case) ~ extra__expo_contact_case,
+      TRUE ~ expo_contact_case
+    )
+  ) %>% 
   clean_linelist(
     path_dictionaries,
     path_corrections_dates,
@@ -61,12 +107,14 @@ ll_cleaned <- ll_import %>%
     write_checks = TRUE
   )
 
+
 purrr::walk(
   countries_update,
   write_by_country,
   dat = ll_cleaned,
-  path_prefix = "local/ll_covid_cleaned_"
+  path_prefix = "local/clean/ll_covid_cleaned_"
 )
+
 
 
 ### Geocoding routines
@@ -75,37 +123,44 @@ ll_geocode <- purrr::map_dfr(
   clean_geo,
   path_corrections_geocodes = path_corrections_geocodes,
   path_shapefiles = path_shapefiles,
-  write_checks = FALSE
+  write_checks = TRUE
 )
 
-llct::query(ll_geocode, is.na(site), id_cols = c(country, OC), count = TRUE)
-llct::query(ll_geocode, is.na(MSF_N_Patient), id_cols = c(country, OC), count = TRUE)
-llct::query(ll_geocode, duplicated(patient_id), id_cols = c(country, OC), count = TRUE)
+
+# ref <- fetch_georef("SDN")
+# 
+# ref %>%
+#   filter(adm1 == "Manipur") %>%
+#   filter(grepl("camp", pcode, ignore.case = TRUE))
+
+
+
+# check again for missing values among important columns
+queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_geocode, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC), count = TRUE)
+
 
 purrr::walk(
   countries_update,
   write_by_country,
   dat = ll_geocode,
-  path_prefix = "local/msf_covid19_linelist_"
+  path_prefix = "local/final/msf_covid19_linelist_"
 )
-
-
-# ref <- fetch_georef("CAF")
-# 
-# ref %>% 
-#   filter(grepl("kabo", adm1, ignore.case = TRUE)) %>%
-#   filter(grepl("Koutiala", adm3, ignore.case = TRUE))
 
 
 
 ### Compile global linelist
-d_global <- list.files("local", pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
+d_global <- list.files("local/final", pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
   arrange(site) %>% 
   rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
-  mutate(db_row = 1:n())
+  mutate(db_row = 1:n()) %>% 
+  mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type")
+
 
 
 # double-check for allowed values
@@ -119,7 +174,7 @@ matchmaker::check_df(
 
 
 
-
+### Write global export
 if (FALSE) {
   path_out_global <- file.path(path_export_global, glue("msf_covid19_linelist_global_{lubridate::today()}"))
   llct::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
@@ -130,6 +185,11 @@ if (FALSE) {
 
 
 ### Write OC-specific files
+queryr::query(d_global, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
+dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(country, OC), count = TRUE)
+
+
+
 d_global_his <- d_global %>% 
   mutate(across(all_of(date_vars), .fns = date_format)) %>% 
   mutate(
@@ -137,10 +197,12 @@ d_global_his <- d_global %>%
       MSF_main_diagnosis,
       "Chronic lung disease (asthma, COPD…)" = "Chronic lung disease (asthma, COPD, etc)"
     )
-  )
+  ) %>% 
+  filter(!patient_id %in% dup_id$value1)
 
-OC_list <- unique(d_global$OC)
 
+
+OC_list <- unique(d_global_his$OC)
 
 
 if (FALSE) {
@@ -149,7 +211,6 @@ if (FALSE) {
     
     # HIS-export
     d_oc_his <- filter(d_global_his, OC == OC_focal)
-    # if (OC_focal == "OCBA") { d_oc_his$age_in_years <- as.integer(round(d_oc_his$age_in_years, 0)) }
     path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
     llct::write_simple_xlsx(d_oc_his, path_out1_oc)
     
@@ -159,5 +220,4 @@ if (FALSE) {
     llct::write_simple_xlsx(d_oc_foc, path_out2_oc)
   }
 }
-
 

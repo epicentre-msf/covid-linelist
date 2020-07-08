@@ -62,7 +62,7 @@ queries_dates <- function(dat_raw, date_vars, dict_date_categories) {
   )
   
   # DATES_06 Specific symptom onset date(s) earlier than Date symptom onset
-  queries[["DATES_06"]] <- query(dates_parse, .x < patcourse_dateonset, cols_dotx = matches("MSF_sympom.*date_onset"))
+  queries[["DATES_06"]] <- query(dates_parse, .x < patcourse_dateonset, cols_dotx = matches("MSF_symptom.*date_onset"))
   
   # DATES_07 ONSET date(s) earlier than EXPOSURE date(s)
   vars_expos <- dict_date_categories$code_name[dict_date_categories$date_category %in% "EXPOSURE"]

@@ -1,26 +1,34 @@
 #' Import triage linelist from AFG
 #' 
 #' 
-import_other_afg <- function(path_linelist_other) {
+import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   
   ## requires
   source("R/zzz.R")
-  source("R/import_other_afg.R")
   source("R/utilities.R")
+  source("R/import_other_afg_tri.R")
   
   
   ### Read linelist
-  file_ll <- list_files(
-    file.path(path_linelist_other, "AFG"),
-    pattern = "xlsx",
+  file_ll <- llu::list_files(
+    file.path(path_linelist_other, "OCP/AFG"),
+    pattern = "\\.xlsx",
     full.names = TRUE,
-    last.sorted = TRUE
+    select = "latest"
   )
   
-  d_orig <- import_afg_helper(file_ll, "AFG_P_TRI")
+  d_orig <- import_afg_tri_helper(file_ll)
   
+  site_meta <- data.frame(
+    msf_facitity = c("hrh", "idp"),
+    site = c("AFG_P_HRH", "AFG_P_IDP"),
+    project = c("HET", "HEI"),
+    site_type = c("Other facility", "Health Centre"),
+    site_name = c("Herat Regional Hospital MSF COVID-19 Triage", "MSF IDP Clinic")
+  )
   
   ### Check for unseen values in derivation variables
+  test_set_equal(d_orig$msf_facitity, c("hrh", "idp"))
   test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", NA))
   test_set_equal(d_orig$hiv_status, c("positive", "negative", "no", "unknown", NA))
   test_set_equal(d_orig$if_positive_on_arv, c("yes", "no", "unknown", NA))
@@ -31,16 +39,19 @@ import_other_afg <- function(path_linelist_other) {
   test_set_equal(d_orig$other_immunodeficiency, c("yes", "no","unknown",  NA))
   test_set_equal(d_orig$malignancy_cancer, c("yes", "no", "unknown", NA))
   
-  
   ### Constants and derived variables
   d_derived <- d_orig %>% 
+    # site metadata
+    mutate(msf_facitity = tolower(msf_facitity)) %>% 
+    left_join(site_meta, by = "msf_facitity") %>% 
     # add various constants
     mutate(
       report_country = "AFG",
       patinfo_idadmin0 = "AFG",
       patinfo_resadmin0 = "AFG",
       patinfo_ageonsetunit = "Year",
-      patinfo_idadmin1 = "Herat"
+      patinfo_idadmin1 = "Herat",
+      MSF_visit_type = "First consultation"
     ) %>% 
     # derive MSF_admin_location_past_week
     mutate(across(province:city_village_idp_camp, ~ ifelse(is.na(.x), "", .x))) %>% 
@@ -76,8 +87,10 @@ import_other_afg <- function(path_linelist_other) {
       # if lab_result negative should they be "Not a case"?
     )) %>% 
     # derive MSF_refer_to
-    mutate(MSF_refer_to = ifelse(referral == "Other:", if_other_58, referral),
-           MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to))
+    mutate(
+      MSF_refer_to = ifelse(referral == "Other:", if_other_58, referral),
+      MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
+    )
   
   
   # # examine variable combos relating to derivation of MSF_covid_status
@@ -213,26 +226,31 @@ import_other_afg <- function(path_linelist_other) {
  
 
 
-import_afg_helper <- function(path, site) {
+import_afg_tri_helper <- function(path, site) {
   
   upload_date <- as.Date(
     stringr::str_extract(path, "[0-9]{4}_[0-9]{2}_[0-9]{2}"),
     format = "%Y_%m_%d"
   )
   
-  readxl::read_xlsx(path, sheet = "data", skip = 1, col_types = "text") %>% 
+  readxl::read_xlsx(
+    path, 
+    sheet = "data",
+    skip = 1, col_types = "text",
+    .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
+  ) %>% 
     janitor::clean_names() %>% 
     mutate(linelist_row = 1:n(),
-           upload_date = upload_date,
+           upload_date = as.character(upload_date),
            linelist_lang = "English",
            linelist_vers = "Other",
            country = "AFG",
            shape = "AFG",
            OC = "OCP",
-           project = NA_character_,
-           site_type = NA_character_,
-           site_name = NA_character_,
-           site = site,
+           # project = NA_character_,
+           # site_type = NA_character_,
+           # site_name = NA_character_,
+           # site = NA_character_,
            uid = NA_character_)
 }
 

@@ -26,12 +26,12 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "AFG"
+    country <- "HTI"
     write_checks <- TRUE
   }
   
   ## read cleaned data
-  dat <- readRDS(glue("local/ll_covid_cleaned_{country}.rds"))
+  dat <- readRDS(glue("local/clean/ll_covid_cleaned_{country}.rds"))
   
   ## shape
   shape <- unique(dat$shape)
@@ -46,12 +46,16 @@ clean_geo <- function(country,
                     sep = "[[:space:]]*\\|[[:space:]]*",
                     fill = "right",
                     remove = FALSE) %>% 
-    select(all_of(col_order), matches("^adm[[:digit:]]_name"))
-
+    select(all_of(col_order), matches("^adm[[:digit:]]_name")) %>% 
+    mutate(across(all_of(adm_cols), ~ ifelse(.x == "", NA_character_, .x)))
+  
+  
   ## geo reference file
-  georef_file <- file.path(path_shapefiles,
-                           shape,
-                           glue::glue("adm_reference_{shape}.rds"))
+  georef_file <- file.path(
+    path_shapefiles,
+    shape,
+    glue::glue("adm_reference_{shape}.rds")
+  )
   
   ## if we have a geo reference DB for given country...
   if (file.exists(georef_file)) {
@@ -59,10 +63,12 @@ clean_geo <- function(country,
     df_geo_ref <- readRDS(georef_file)
     
     ## manual corrections
-    file_recode <- list_files(path_corrections_geocodes,
-                              pattern = glue::glue("geocodes_recode_{shape}"),
-                              full.names = TRUE,
-                              last.sorted = TRUE)
+    file_recode <- llu::list_files(
+      path_corrections_geocodes,
+      pattern = paste0("geocodes_recode", shape),
+      full.names = TRUE,
+      select = "latest"
+    )
     
     dict_recode <- if (length(file_recode) == 1) {
       readxl::read_xlsx(file_recode)
@@ -70,9 +76,9 @@ clean_geo <- function(country,
       NULL
     }
     
-    df_manual_check_full <- list_files(
+    df_manual_check_full <- llu::list_files(
       path_corrections_geocodes,
-      pattern = glue("geocodes_check_{shape}"),
+      pattern = paste0("geocodes_check_", shape),
       full.names = TRUE
     ) %>%
       purrr::map_dfr(readxl::read_xlsx, guess_max = 5000) %>%
@@ -106,8 +112,19 @@ clean_geo <- function(country,
                                     dict = dict_recode,
                                     fuzzy = TRUE,
                                     code_col = "pcode") %>% 
-      select(-level)
+      select(-level) %>% 
+      mutate_all(as.character)
     
+    # df_match_best %>% 
+    #   filter(is.na(match_type)) %>% 
+    #   select(starts_with("adm")) %>% 
+    #   hmatch::hmatch_shift(., df_geo_ref, pattern = "^adm")
+    
+    
+    if (nrow(df_match_best) > nrow(df_geo_raw)) {
+      warning("rows duplicated by hmatch::hmatch(), country ", country, call. = FALSE)
+    }
+    # update hmatch to handle when adm4 NA and level == 4
     
     ## write file for manual correction
     out_check <- df_match_best %>% 
@@ -121,14 +138,26 @@ clean_geo <- function(country,
     
     if (write_checks & nrow(out_check) > 0) {
       
+      # archive previous file
+      if (nrow(df_manual_check_full) > 0) {
+        file_out_archive <- glue::glue("geocodes_check_{shape}_{time_stamp()}.xlsx")
+        
+        llct::write_simple_xlsx(
+          df_manual_check_full,
+          file = file.path(path_corrections_geocodes, "archive", file_out_archive),
+          group = level_raw
+        )
+      }
+        
+      # append new checks to old file and write
       dict_geo_correct_write <- df_manual_check_full %>% 
         select(-any_of("i")) %>% 
         mutate(new = NA_character_)
       
       dict_geo_out <- out_check %>% 
         mutate(new = "Yes") %>%
-        bind_rows(dict_geo_correct_write, .) %>% 
-        distinct(adm1, adm2, adm3, adm4, .keep_all = TRUE)
+        bind_rows(dict_geo_correct_write, .) %>%
+        distinct(adm1, adm2, adm3, adm4, .keep_all = TRUE) %>% 
         arrange(level_raw, level_ref)
       
       file_out <- glue::glue("geocodes_check_{shape}.xlsx")

@@ -25,9 +25,15 @@ import_linelists <- function(country,
   library(hmatch)
   source("R/import.R")
   
+  if (FALSE) {
+    country <- "BGD"
+  }
+  
   ## scan and parse linelist files to identify the most recent linelist file to
   # import for each facility
   df_sheets <- scan_sheets(path_data_raw, country, dict_facilities)
+  
+  if (nrow(df_sheets) == 0) return(NULL)
   
   ## derived columns
   cols_derive <- c("db_row",
@@ -49,7 +55,16 @@ import_linelists <- function(country,
   ## import and prepare
   df_data <- df_sheets %>%
     group_by(country, shape, OC, project, site_type, site_name, site, uid, upload_date) %>% 
-    do(read_and_prepare_data(file_path = .$file_path, dict_extra_vars = dict_extra_vars)) %>%
+    do(
+      read_and_prepare_data(
+        file_path = .$file_path,
+        site = .$site,
+        dict_linelist = dict_linelist,
+        dict_extra_vars = dict_extra_vars,
+        dict_vars_exclude = dict_vars_exclude,
+        cols_derive = cols_derive
+      )
+    ) %>%
     ungroup() %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
@@ -60,20 +75,7 @@ import_linelists <- function(country,
   ll_template <- ll_template[!grepl("^MSF_variable_additional", ll_template)]
   cols_to_add <- setdiff(ll_template, names(df_data))
   df_data[cols_to_add] <- NA_character_
-  
-  # check for new columns to be manually renamed
   extra_cols <- grep("^extra__", names(df_data), value = TRUE)
-  new_cols <- setdiff(names(df_data), c(cols_derive, ll_template, extra_cols))
-  
-  # remove unnecessary columns
-  pref_exclude <- "^X0|^Añadir.el.nombre|^Ajouter.le.nom|^Add.variable.name|^MSF_variable_additional"
-  new_cols <- new_cols[!grepl(pref_exclude, new_cols)]
-  new_cols <- setdiff(new_cols, dict_vars_exclude[[1]])
-  
-  # arrange cols
-  if (length(new_cols) > 0) {
-    message("New linelist columns to rename:\n", paste(new_cols, collapse = "\n"))
-  }
   
   ## return
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
@@ -105,11 +107,14 @@ scan_sheets <- function(path_data_raw,
   
   # paths to linelist files for given country
   path_data_raw_country <- file.path(path_data_raw, country)
-  files_country <- list.files(path_data_raw_country,
-                              pattern = glue::glue("^linelist_Covid_anonymous__{country}"))
-
+  
+  files_country <- list.files(
+    path_data_raw_country,
+    pattern = glue::glue("^linelist_Covid_anonymous__{country}.*\\.xlsx")
+  )
+  
   # regex patterns to remove from file path prior to parsing
-  reg_rm <- "^linelist_Covid_anonymous__|_[[:digit:]]{2}-[[:digit:]]{2}\\.xlsb"
+  reg_rm <- "^linelist_Covid_anonymous__|_[[:digit:]]{2}-[[:digit:]]{2}\\.xlsx"
 
   # variables to parse from file path
   vars_parse <- c("country",
@@ -134,6 +139,7 @@ scan_sheets <- function(path_data_raw,
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
     mutate(site_name_join = hmatch::string_std(site_name)) %>% 
     select(-site_name, -project, -key) %>% 
+    mutate_all(as.character) %>% 
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
     select(-site_name_join) %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))
@@ -162,37 +168,72 @@ scan_sheets <- function(path_data_raw,
 #' Linelist <tibble> for a single facility, after minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #'
-read_and_prepare_data <- function(file_path, dict_extra_vars) {
+read_and_prepare_data <- function(file_path,
+                                  site,
+                                  dict_extra_vars,
+                                  dict_linelist,
+                                  dict_vars_exclude,
+                                  cols_derive) {
 
   ## requires
   library(dplyr)
   library(janitor)
-  library(readxlsb)
   source("R/utilities.R")
   
+  if (FALSE) {
+    file_path <- df_sheets$file_path[1]
+    site <- df_sheets$file_path[1]
+  }
+  
   ## read linelist from relevant excel sheet
-  df <- readxlsb::read_xlsb(file_path,
-                            sheet = "linelist",
-                            col_types = "string")
+  df <- readxl::read_xlsx(
+    file_path,
+    sheet = "linelist",
+    col_types = "text",
+    .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
+  )
   
   ## get linelist version and language
   df_meta <- get_site_meta(file_path)
   
   if (nrow(df) > 0) {
-    ## check for column names beginning with ".." (missing name in excel file)
-    if (any(grepl("^\\.\\.", names(df)))) {
-      stop("Missing column names in file: ", file_path)
-    }
+    # ## check for column names beginning with ".." (missing name in excel file)
+    # if (any(grepl("^0", names(df)))) {
+    #   stop("Missing column names in file ", file_path)
+    # }
     
     ## remove empty rows/cols, recode column names, and add linelist row number
     out <- df %>% 
       dplyr::as_tibble() %>% 
+      select(-starts_with("0")) %>%
       mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
+      mutate_all(as.character) %>% 
       janitor::remove_empty(which = c("rows")) %>%
       dplyr::rename_with(., .fn = recode_columns, dict_extra_vars = dict_extra_vars) %>%
       mutate(linelist_row = seq_len(n())) %>% 
       select(linelist_row, everything()) %>% 
       bind_cols(df_meta, .)
+    
+    
+    ## columns to add (from original ll template)
+    ll_template <- dict_linelist$code_name
+    ll_template <- ll_template[!grepl("^MSF_variable_additional", ll_template)]
+    # cols_to_add <- setdiff(ll_template, names(out))
+    # df_data[cols_to_add] <- NA_character_
+    
+    # check for new columns to be manually renamed
+    extra_cols <- grep("^extra__", names(out), value = TRUE)
+    new_cols <- setdiff(names(out), c(cols_derive, ll_template, extra_cols))
+    
+    # remove unnecessary columns
+    pref_exclude <- "^0\\.\\.|^X0|^Añadir el nombre|^Ajouter le nom|^Add variable name|^MSF_variable_additional"
+    new_cols <- new_cols[!grepl(pref_exclude, new_cols)]
+    new_cols <- setdiff(new_cols, dict_vars_exclude[[1]])
+    
+    # arrange cols
+    if (length(new_cols) > 0) {
+      message("New linelist columns to rename for site ", site, ":\n", paste(new_cols, collapse = "\n"))
+    }
     
   } else {
     out <- tibble(linelist_row = integer(0))
