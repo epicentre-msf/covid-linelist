@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "HTI"
+    country <- "AFG"
     write_checks <- TRUE
   }
   
@@ -105,20 +105,17 @@ clean_geo <- function(country,
     
     raw_names <- names(df_geo_raw)
     
-    df_match_best <- hmatch::hmatch(raw = df_geo_raw,
-                                    ref = df_geo_ref,
-                                    man = df_geo_manual,
-                                    pattern = "^adm",
-                                    dict = dict_recode,
-                                    fuzzy = TRUE,
-                                    code_col = "pcode") %>% 
+    df_match_best <- hmatch::hmatch_composite(
+      raw = df_geo_raw,
+      ref = df_geo_ref,
+      man = df_geo_manual,
+      pattern = "^adm",
+      dict = dict_recode,
+      fuzzy = TRUE,
+      code_col = "pcode"
+    ) %>% 
       select(-level) %>% 
       mutate_all(as.character)
-    
-    # df_match_best %>% 
-    #   filter(is.na(match_type)) %>% 
-    #   select(starts_with("adm")) %>% 
-    #   hmatch::hmatch_shift(., df_geo_ref, pattern = "^adm")
     
     
     if (nrow(df_match_best) > nrow(df_geo_raw)) {
@@ -130,7 +127,7 @@ clean_geo <- function(country,
     out_check <- df_match_best %>% 
       janitor::remove_empty("rows") %>% 
       anti_join(df_manual_check_full, by = raw_names) %>%
-      filter(is.na(match_type) | grepl("best", match_type)) %>% 
+      filter(is.na(match_type) | grepl("settle", match_type)) %>% 
       mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
              level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
       arrange(level_ref, adm1, adm2, adm3, adm4) %>% 
