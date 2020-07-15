@@ -11,19 +11,19 @@
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
+import_other_bel_ocb <- function(path_linelist_other, dict_linelist) {
   
   ## requires
   library(dplyr)
   library(hmatch)
   
-  path_to_files <- file.path(path_linelist_other, "OCB", "HTI")
+  path_to_files <- file.path(path_linelist_other, "OCB", "BEL")
   
-  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_HTI.xlsx") %>% 
+  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_BEL.xlsx") %>% 
     readxl::read_xlsx() %>% 
     janitor::clean_names() %>% 
-    select(1, 7, 8, 9, 10) %>% 
-    setNames(c("var_epi", "map_type", "map_direct", "map_constant", "map_derive"))
+    select(1, 6, 7, 8, 9, 10) %>% 
+    setNames(c("var_epi", "category", "map_type", "map_direct", "map_constant", "map_derive"))
   
   df_map_direct <- df_map %>% 
     filter(map_type == "1:1 correspondence") %>% 
@@ -33,7 +33,7 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   vec_map_direct <- setNames(df_map_direct$map_direct_std, df_map_direct$var_epi)
   
   df_map_constant <- df_map %>% 
-    filter(map_type == "Constant value") %>% 
+    filter(map_type == "Constant value", !category %in% "Site metadata") %>% 
     select(var_epi, map_constant) %>% 
     tidyr::pivot_wider(names_from = "var_epi", values_from = "map_constant")
   
@@ -43,7 +43,7 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   
   file_ll <- llu::list_files(
     path_to_files,
-    pattern = "BD_LL_MT.*\\.xlsx",
+    pattern = "TT linelist.*\\.xlsx",
     ignore.case = TRUE,
     full.names = TRUE,
     select = "latest"
@@ -53,32 +53,45 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", na = c("", "NA")) %>% 
+  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 1) %>% 
+    janitor::remove_empty("rows") %>% 
     janitor::clean_names() %>% 
-    mutate(site = "HTI_B_MAR") %>% 
+    mutate(site = "BEL_B_TOU") %>% 
     dplyr::left_join(dict_facilities_join, by = "site") %>% 
     mutate(upload_date = as.character(llu::extract_date(file_ll)))
 
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$symptomatique, c("oui", "non", NA))
-  test_set_equal(d_orig$symptomatique_a_la_sortie,  c("oui", "non", "na, sympt. à l'admission", NA))
+  test_set_equal(d_orig$substance_abuse, c("yes", "no", NA))
+  test_set_equal(d_orig$gastro_intestinal, c("yes", "no", NA))
+  test_set_equal(d_orig$psychiatric_condition, c("yes", "no", NA))
   
   ### Derived variables
   d_derive <- d_orig %>% 
-    mutate(MSF_N_Patient = paste0("TEMPID_", formatC(1:n(), width = 3, flag = "0"))) %>% 
-    mutate(across(c(symptomatique, symptomatique_a_la_sortie), tolower)) %>% 
-    mutate(patcourse_asymp = case_when(
-      symptomatique == "oui" ~ "Non",
-      symptomatique == "non" ~ "Oui"
-    )) %>% 
-    mutate(outcome_asymp = case_when(
-      symptomatique == "oui" | symptomatique_a_la_sortie == "oui" ~ "Non",
-      !symptomatique %in% "oui" & symptomatique_a_la_sortie == "no" ~ "Oui"
-    ))
+    # derive Comcond_other
+    mutate(across(c(substance_abuse, gastro_intestinal, psychiatric_condition), tolower)) %>% 
+    mutate(substance_abuse = ifelse(substance_abuse == "yes", "Substance abuse", NA),
+           gastro_intestinal = ifelse(gastro_intestinal == "yes", "Gastrointestinal", NA),
+           psychiatric_condition = ifelse(psychiatric_condition == "yes", "Psychiatric condition", NA)) %>% 
+    unite(Comcond_other, c(substance_abuse, gastro_intestinal, psychiatric_condition, other_63), na.rm = TRUE, sep = ", ", remove = FALSE) %>% 
+    mutate(Comcond_other = ifelse(Comcond_other == "", NA_character_, Comcond_other)) %>% 
+    # derive MSF_refer_from
+    unite(MSF_refer_from, c(referral_source_type, referral_source_name), na.rm = TRUE, sep = ": ", remove = FALSE) %>% 
+    mutate(MSF_refer_from = ifelse(MSF_refer_from == "", NA_character_, MSF_refer_from)) %>% 
+    # derive MSF_date_consultation
+    mutate(across(c(date_of_admission_to_suspect_ward, date_of_admission_to_confirmed_ward), parse_dates)) %>% 
+    mutate(MSF_date_consultation = map2_chr(date_of_admission_to_suspect_ward, date_of_admission_to_confirmed_ward,
+                                            ~ as.character(min_safe(c(.x, .y))))) %>%
+    # derive copies of MSF_date_consultation
+    mutate(patcourse_presHCF = MSF_date_consultation,
+           outcome_patcourse_presHCF = MSF_date_consultation)
   
-  # d_derive %>%
-  #   count(symptomatique, symptomatique_a_la_sortie, patcourse_asymp, outcome_asymp)
+    # d_derive %>% 
+    #   select(Comcond_other, substance_abuse, gastro_intestinal, psychiatric_condition, other_63) %>% 
+    #   unique()  
     
+    # d_derive %>%
+    #   count(MSF_refer_from, referral_source_type, referral_source_name) %>%
+    #   print(n = "all")
   
   ### Constants and 1:1 mappings
   d_out <- d_derive %>% 
@@ -110,7 +123,7 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
     ungroup() %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n()) %>% 
-    mutate(linelist_lang = ll_language,
+    mutate(linelist_lang = "English",
            linelist_vers = "Other")
   
   ## columns to add (from original ll template)

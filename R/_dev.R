@@ -11,26 +11,29 @@ source("R/geocode.R")
 # geo-match, and write resulting cleaned linelist files
 
 # focal country ISO code
-countries_update <- setdiff(countries, "TCD")
+countries_update <- countries
 
 ### Import non-Epicentre linelists
 source("R/import_other_afg_tri.R")
-source("R/import_other_yem_ocp.R")
-source("R/import_other_yem_pra.R")
-source("R/import_other_yem_moh.R")
+source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
-source("R/import_other_ssd_ocg.R") # temp solution
+# source("R/import_other_ssd_ocg.R") # temp solution
+source("R/import_other_yem_ocb.R")
+source("R/import_other_yem_ocp.R")
+source("R/import_other_yem_pra.R")
+
 
 
 
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
-ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
-ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
+ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
-ll_other_ssd_ocg <- import_other_ssd_ocg(path_linelist_other, dict_linelist)
-# ll_other_yem_moh <- import_other_yem_moh(path_linelist_other, dict_linelist)
+# ll_other_ssd_ocg <- import_other_ssd_ocg(path_linelist_other, dict_linelist) # these rows now in main export
+ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist)
+ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
+ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 
 
 ### Import Epicentre-version linelists
@@ -49,11 +52,13 @@ ll_import_epicentre <- purrr::map_dfr(
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
   ll_other_afg_tri,
-  ll_other_yem_ocp,
-  ll_other_yem_pra,
+  ll_other_bel_ocb,
   ll_other_cod_oca,
   ll_other_hti_ocb,
-  ll_other_ssd_ocg
+  # ll_other_ssd_ocg,
+  ll_other_yem_ocb,
+  ll_other_yem_ocp,
+  ll_other_yem_pra
 )
 
 
@@ -95,6 +100,8 @@ ll_cleaned <- ll_import %>%
       TRUE ~ expo_contact_case
     )
   ) %>% 
+  # CAF_E_BAT has wrong language in options sheet
+  mutate(linelist_lang = ifelse(site == "CAF_E_BAT", "English", linelist_lang)) %>% 
   clean_linelist(
     path_dictionaries,
     path_corrections_dates,
@@ -106,6 +113,8 @@ ll_cleaned <- ll_import %>%
     dict_countries_correct,
     write_checks = TRUE
   )
+
+
 
 
 purrr::walk(
@@ -127,11 +136,11 @@ ll_geocode <- purrr::map_dfr(
 )
 
 
-# ref <- fetch_georef("SDN")
+# ref <- fetch_georef("YEM")
 # 
 # ref %>%
-#   filter(adm1 == "Manipur") %>%
-#   filter(grepl("camp", pcode, ignore.case = TRUE))
+#   # filter(adm1 == "Manipur") %>%
+#   filter(grepl("yahya", pcode, ignore.case = TRUE))
 
 
 
