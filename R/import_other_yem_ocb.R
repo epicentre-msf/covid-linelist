@@ -105,8 +105,8 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate(test_result = the_test_result_negative_positive_not_done_pending) %>% 
     mutate(across(c(test_result, diagnostic_mechanism), tolower)) %>% 
     mutate(MSF_covid_status = case_when(
-      test_result %in% "positive" | is.na(test_result) & diagnostic_mechanism == "ct.scan" ~ "Confirmed",
-      test_result == "negative" ~ "Not a case",
+      test_result %in% "positive" | diagnostic_mechanism == "ct.scan" ~ "Confirmed",
+      test_result == "negative" & !diagnostic_mechanism %in% "ct.scan" ~ "Not a case",
       TRUE ~ "Probable"
     )) %>% 
     # derive patcourse_asymp
