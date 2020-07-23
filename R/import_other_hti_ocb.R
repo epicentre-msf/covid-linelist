@@ -17,6 +17,12 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   library(dplyr)
   library(hmatch)
   
+  
+  dict_facilities_join <- dict_facilities %>% 
+    mutate_all(as.character) %>% 
+    select(site, country, shape, OC, project, site_name, site_type, uid)
+
+  
   path_to_files <- file.path(path_linelist_other, "OCB", "HTI")
   
   df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_HTI.xlsx") %>% 
@@ -41,23 +47,31 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
   
-  file_ll <- llu::list_files(
-    path_to_files,
-    pattern = "BD_LL_MT.*\\.xlsx",
-    ignore.case = TRUE,
-    full.names = TRUE,
-    select = "latest"
+  files_ll <- c(
+    HTI_B_MAR = llu::list_files(
+      file.path(path_to_files, "Martissant"),
+      pattern = "BD_LL_MT.*\\.xlsx",
+      select = "latest"
+    ),
+    HTI_B_PIM = llu::list_files(
+      file.path(path_to_files, "Port-a-Piment"),
+      pattern = "LLa PaPim.*\\.xlsx",
+      select = "latest"
+    )
   )
   
-  dict_facilities_join <- dict_facilities %>% 
-    mutate_all(as.character) %>% 
-    select(site, country, shape, OC, project, site_name, site_type, uid)
+  d_orig <- purrr::map2_dfr(
+    files_ll,
+    names(files_ll),
+    import_hti_ocb_
+  ) %>% 
+    dplyr::left_join(dict_facilities_join, by = "site")
   
-  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", na = c("", "NA")) %>% 
-    janitor::clean_names() %>% 
-    mutate(site = "HTI_B_MAR") %>% 
-    dplyr::left_join(dict_facilities_join, by = "site") %>% 
-    mutate(upload_date = as.character(llu::extract_date(file_ll)))
+  # d_orig <- readxl::read_xlsx(file_ll, col_types = "text", na = c("", "NA")) %>% 
+  #   janitor::clean_names() %>% 
+  #   mutate(site = "HTI_B_MAR") %>% 
+  #   dplyr::left_join(dict_facilities_join, by = "site") %>% 
+  #   mutate(upload_date = as.character(llu::extract_date(file_ll)))
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$symptomatique, c("oui", "non", NA))
@@ -126,4 +140,21 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
 }
  
+
+
+
+import_hti_ocb_ <- function(path, site) {
+  
+  readxl::read_xlsx(
+    path, 
+    col_types = "text",
+    na = c("", "NA"),
+    .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
+  ) %>% 
+    janitor::clean_names() %>% 
+    janitor::remove_empty("rows") %>% 
+    mutate(linelist_row = 1:n(),
+           upload_date = as.character(llu::extract_date(path)),
+           site = site)
+}
 

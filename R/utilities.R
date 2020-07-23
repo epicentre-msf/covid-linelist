@@ -1,4 +1,24 @@
 
+
+map_columns <- function(data, vec_map) {
+  
+  for (i in seq_along(vec_map)) {
+    col_old <- as.character(vec_map[i])
+    col_new <- names(vec_map[i])
+    data[[col_new]] <- data[[col_old]]
+  }
+  
+  data[,!names(data) %in% as.character(vec_map)]
+}
+
+
+read_query_trackers <- function(path) {
+  dplyr::bind_rows(
+    readxl::read_xlsx(path, sheet = "Current", col_types = "text"),
+    readxl::read_xlsx(path, sheet = "Resolved", col_types = "text")
+  )
+}
+
 test_set_equal <- function(x, allowed, to.lower = TRUE) {
   
   var <- deparse(substitute(x))

@@ -32,16 +32,17 @@ import_other_yem_pra <- function(path_linelist_other, dict_linelist) {
   
   test_set_equal(d_orig$site_name, c("haydan hospital", "al salam hospital"))
   
+  
   d_derived <- d_orig %>% 
     # derive MSF_admin_location_past_week
     mutate(
-      adm2_name__res = ifelse(adm2_name__res == "Other", NA_character_, adm2_name__res),
-      admin2 = case_when(
-        !is.na(adm2_name__res) ~ adm2_name__res,
-        TRUE ~ MSF_location_admin2
-      ),
-      admin2 = ifelse(is.na(admin2), "", admin2),
-      MSF_admin_location_past_week = glue::glue(" | {admin2} | | ")
+      across(c(admin1_aligned, admin2_aligned), ~ ifelse(.x == "Other", NA_character_, .x)),
+      across(c(admin1_aligned, admin2_aligned), ~ ifelse(is.na(.x), "", .x)),
+      # admin2 = case_when(
+      #   !is.na(adm2_name__res) ~ adm2_name__res,
+      #   TRUE ~ MSF_location_admin2
+      # ),
+      MSF_admin_location_past_week = glue::glue("{admin1_aligned} | {admin2_aligned} | | ")
     )
   
   ## derived columns

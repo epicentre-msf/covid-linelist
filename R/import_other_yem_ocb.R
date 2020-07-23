@@ -43,7 +43,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   
   file_ll <- llu::list_files(
     path_to_files,
-    pattern = "Gamhouria.*\\.xlsx",
+    pattern = "Al Gam.*\\.xlsx",
     ignore.case = TRUE,
     full.names = TRUE,
     select = "latest"
@@ -64,7 +64,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$the_test_result_negative_positive_not_done_pending, c("negative", "positive", NA))
-  test_set_equal(d_orig$diagnostic_mechanism, c("ct.scan", NA))
+  test_set_equal(d_orig$diagnostic_mechanism, c("ct.scan", "ct,scan", "chest.x-ray", "x-ray", NA))
   test_set_equal(d_orig$cardiovascular_disease_yes_no, c("yes", "no", NA))
   test_set_equal(d_orig$if_she_is_pregnant_in_which_month_no, c(NA)) # reassess derivation if values populated
   
@@ -105,8 +105,8 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate(test_result = the_test_result_negative_positive_not_done_pending) %>% 
     mutate(across(c(test_result, diagnostic_mechanism), tolower)) %>% 
     mutate(MSF_covid_status = case_when(
-      test_result %in% "positive" | diagnostic_mechanism == "ct.scan" ~ "Confirmed",
-      test_result == "negative" & !diagnostic_mechanism %in% "ct.scan" ~ "Not a case",
+      test_result %in% "positive" | diagnostic_mechanism %in% c("ct.scan", "ct,scan", "chest.x-ray") ~ "Confirmed",
+      test_result == "negative" & !diagnostic_mechanism %in% c("ct.scan", "ct,scan", "chest.x-ray") ~ "Not a case",
       TRUE ~ "Probable"
     )) %>% 
     # derive patcourse_asymp

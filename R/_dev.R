@@ -11,7 +11,7 @@ source("R/geocode.R")
 # geo-match, and write resulting cleaned linelist files
 
 # focal country ISO code
-countries_update <- countries
+countries_update <- sort(c(countries, "BEL")) # update to include countries in linelist-other
 
 ### Import non-Epicentre linelists
 source("R/import_other_afg_tri.R")
@@ -22,8 +22,7 @@ source("R/import_other_hti_ocb.R")
 source("R/import_other_yem_ocb.R")
 source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
-
-
+source("R/import_other_bgd_godata.R")
 
 
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
@@ -34,6 +33,8 @@ ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
+ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist)
+
 
 
 ### Import Epicentre-version linelists
@@ -58,7 +59,8 @@ ll_import <- dplyr::bind_rows(
   # ll_other_ssd_ocg,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
-  ll_other_yem_pra
+  ll_other_yem_pra,
+  ll_other_bgd_godata
 )
 
 
@@ -82,7 +84,7 @@ queryr::query(
 
 # save raw country-specific RDS files
 purrr::walk(
-  countries_update,
+  sort(unique(ll_import$country)),
   write_by_country,
   dat = ll_import
 )
@@ -100,8 +102,8 @@ ll_cleaned <- ll_import %>%
       TRUE ~ expo_contact_case
     )
   ) %>% 
-  # CAF_E_BAT has wrong language in options sheet
-  mutate(linelist_lang = ifelse(site == "CAF_E_BAT", "English", linelist_lang)) %>% 
+  # CAF_E_BAT had wrong language in options sheet
+  # mutate(linelist_lang = ifelse(site == "CAF_E_BAT", "English", linelist_lang)) %>% 
   clean_linelist(
     path_dictionaries,
     path_corrections_dates,
@@ -118,7 +120,7 @@ ll_cleaned <- ll_import %>%
 
 
 purrr::walk(
-  countries_update,
+  sort(unique(ll_cleaned$country)),
   write_by_country,
   dat = ll_cleaned,
   path_prefix = "local/clean/ll_covid_cleaned_"
@@ -136,11 +138,12 @@ ll_geocode <- purrr::map_dfr(
 )
 
 
-# ref <- fetch_georef("YEM")
+# ref <- fetch_georef("VEN")
 # 
 # ref %>%
-#   # filter(adm1 == "Manipur") %>%
-#   filter(grepl("yahya", pcode, ignore.case = TRUE))
+#   # filter(adm2 == "Douentza") %>%
+#   # filter(level == 3) %>%
+#   filter(grepl("campo", pcode, ignore.case = TRUE))
 
 
 
@@ -157,7 +160,6 @@ purrr::walk(
   dat = ll_geocode,
   path_prefix = "local/final/msf_covid19_linelist_"
 )
-
 
 
 ### Compile global linelist
@@ -229,4 +231,5 @@ if (FALSE) {
     llct::write_simple_xlsx(d_oc_foc, path_out2_oc)
   }
 }
+
 

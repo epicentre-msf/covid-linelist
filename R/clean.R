@@ -190,6 +190,7 @@ clean_linelist <- function(dat,
     value = TRUE, check_date = TRUE
   )
   
+  
   dat_date_flags <- dat_date %>%
     select(-value, -flag_ambiguous) %>%
     tidyr::spread(variable, date) %>% 
@@ -200,7 +201,7 @@ clean_linelist <- function(dat,
       # flag_report_before_expo_case = report_date < expo_case_date_first1,
       # flag_lab1_before_expo_travel = Lab_date1 < expo_travel_date1,
       # flag_lab1_before_expo_case = Lab_date1 < expo_case_date_first1,
-      flag_outcome_before_consult = outcome_date_of_outcome < MSF_date_consultation,
+      flag_outcome_before_consult = as.numeric(outcome_date_of_outcome - MSF_date_consultation) < -5,
       # flag_outcome_before_lab1 = outcome_date_of_outcome < Lab_date1,
       # flag_submit_before_consult = outcome_submitted_date < MSF_date_consultation,
       # flag_submit_before_lab1 = outcome_submitted_date < Lab_date1
