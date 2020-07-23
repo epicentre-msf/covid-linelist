@@ -103,18 +103,19 @@ path_corrections <- file.path(path_cleaning, "manual-corrections")
 readxl::read_xlsx(file.path(path_corrections, "dates", "dates_check_compiled_2020-07-22_1607.xlsx")) %>% 
   filter(patient_id == "UKR_G_MB1_UA317072003") %>% 
   select(patient_id, variable, value, date, date_correct, flag) %>% 
+  slice(-2) %>% 
   mutate(patient_id = "FRA_P_PAR_01") %>%
   mutate_all(~ ifelse(is.na(.x), "", .x)) %>% 
   knitr::kable()
 ```
 
-The patient entry above is flagged because there are two date values earlier
-than 2020-02-01 (the stated year is 2007). The month and day portions of the two
-entries for 2007 look reasonable in the context of the other date values, so
-here I make the correction to 2020-07-17 (in column `date_correct`).
+The patient entry above is flagged because there is a date value earlier than
+2020-02-01 (the stated year is 2007). The month and day portions of the entry
+for 2007 look reasonable in the context of the other date values, so here I make
+the correction to 2020-07-17 (in column `date_correct`).
 
 The manual correction is specific to the particular `patient_id`, variable, and
-original date value, so if the two early date values are changed in the original
+original date value, so if the early date value is changed in the original
 linelist the following week, the manual correction will no longer be triggered.
 
 _Example 2_
@@ -122,8 +123,6 @@ _Example 2_
 ```{r, echo=FALSE}
 readxl::read_xlsx(file.path(path_corrections, "dates", "dates_check_compiled_2020-07-22_1607.xlsx")) %>% 
   filter(patient_id == "YEM_B_GAM_55") %>% 
-  # filter(patient_id == "BRA_B_SAL_209") %>% 
-  # slice(-2, -5, -6) %>% 
   select(patient_id, variable, value, date, date_correct, flag) %>% 
   mutate(patient_id = "FRA_P_PAR_02") %>% 
   mutate_all(~ ifelse(is.na(.x), "", .x)) %>% 

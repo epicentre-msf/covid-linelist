@@ -89,24 +89,23 @@ date checks implemented within the queries sent to sites every week.
 
 *Example 1*
 
-| patient\_id     | variable                         | value      | date       | date\_correct | flag       |
-| :-------------- | :------------------------------- | :--------- | :--------- | :------------ | :--------- |
-| FRA\_P\_PAR\_01 | patcourse\_dateonset             | 39280      | 2007-07-17 | 2020-07-17    | too\_early |
-| FRA\_P\_PAR\_01 | MSF\_symptom\_cough\_date\_onset | 39280      | 2007-07-17 | 2020-07-17    | too\_early |
-| FRA\_P\_PAR\_01 | report\_date                     | 44029      | 2020-07-17 |               |            |
-| FRA\_P\_PAR\_01 | MSF\_date\_consultation          | 44029      | 2020-07-17 |               |            |
-| FRA\_P\_PAR\_01 | upload\_date                     | 2020-07-22 | 2020-07-22 |               |            |
+| patient\_id     | variable                | value      | date       | date\_correct | flag       |
+| :-------------- | :---------------------- | :--------- | :--------- | :------------ | :--------- |
+| FRA\_P\_PAR\_01 | patcourse\_dateonset    | 39280      | 2007-07-17 | 2020-07-17    | too\_early |
+| FRA\_P\_PAR\_01 | report\_date            | 44029      | 2020-07-17 |               |            |
+| FRA\_P\_PAR\_01 | MSF\_date\_consultation | 44029      | 2020-07-17 |               |            |
+| FRA\_P\_PAR\_01 | upload\_date            | 2020-07-22 | 2020-07-22 |               |            |
 
-The patient entry above is flagged because there are two date values
-earlier than 2020-02-01 (the stated year is 2007). The month and day
-portions of the two entries for 2007 look reasonable in the context of
-the other date values, so here I make the correction to 2020-07-17 (in
-column `date_correct`).
+The patient entry above is flagged because there is a date value earlier
+than 2020-02-01 (the stated year is 2007). The month and day portions of
+the entry for 2007 look reasonable in the context of the other date
+values, so here I make the correction to 2020-07-17 (in column
+`date_correct`).
 
 The manual correction is specific to the particular `patient_id`,
-variable, and original date value, so if the two early date values are
-changed in the original linelist the following week, the manual
-correction will no longer be triggered.
+variable, and original date value, so if the early date value is changed
+in the original linelist the following week, the manual correction will
+no longer be triggered.
 
 *Example 2*
 
