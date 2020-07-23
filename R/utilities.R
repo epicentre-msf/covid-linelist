@@ -1,5 +1,14 @@
 
 
+#' Guess ISO3 country code by converting from iso2c and country.name
+guess_countrycode <- function(x) {
+  x1 = countrycode::countrycode(x, "iso2c", "iso3c", warn = FALSE)
+  x2 = countrycode::countrycode(x, "country.name", "iso3c", warn = FALSE)
+  dplyr::coalesce(x1, x2)
+}
+
+
+
 map_columns <- function(data, vec_map) {
   
   for (i in seq_along(vec_map)) {

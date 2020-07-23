@@ -36,7 +36,7 @@ clean_linelist <- function(dat,
 
   ## if running manually
   if (FALSE) {
-    dat <- ll_import
+    dat <- ll_cleaned
     write_checks <- TRUE
   }
   
@@ -50,6 +50,7 @@ clean_linelist <- function(dat,
     mutate(MSF_N_Patient = ifelse(temp_update_ids, temp_MSF_N_Patient, MSF_N_Patient),
            patient_id = ifelse(temp_update_ids, temp_patient_id, patient_id)) %>% 
     select(-temp_update_ids, -temp_MSF_N_Patient, -temp_patient_id)
+  
   
   #### Clean numeric variables -------------------------------------------------
   
@@ -101,6 +102,15 @@ clean_linelist <- function(dat,
   ## check for non-missing values not converted to numeric
   if (any(dat_numeric$flag)) {
 
+    ## archive current dictionary
+    file_out_archive <- glue::glue("dict_numeric_correct_{time_stamp()}.xlsx")
+    
+    llct::write_simple_xlsx(
+      dict_numeric_correct,
+      file = file.path(path_dictionaries, "archive", file_out_archive)
+    )
+    
+    ## update dictionary
     check_numeric_append <- dat_numeric %>%
       filter(flag) %>% 
       select(patient_id, variable, value) %>% 
@@ -167,44 +177,23 @@ clean_linelist <- function(dat,
   
   # define flag-variable mappings
   df_flags <- tibble(
-    flag = c(rep("flag_upload_before_report", 2),
-             rep("flag_report_before_onset", 2),
-             rep("flag_report_before_expo_travel", 2),
-             rep("flag_report_before_expo_case", 2),
-             rep("flag_lab1_before_expo_travel", 2),
-             rep("flag_lab1_before_expo_case", 2),
-             rep("flag_outcome_before_consult", 2),
-             rep("flag_outcome_before_lab1", 2),
-             rep("flag_submit_before_consult", 2),
-             rep("flag_submit_before_lab1", 2)),
-    variable = c("upload_date", "report_date",
-                 "report_date", "patcourse_dateonset",
-                 "report_date", "expo_travel_date1",
-                 "report_date", "expo_case_date_first1",
-                 "Lab_date1", "expo_travel_date1",
-                 "Lab_date1", "expo_case_date_first1",
-                 "outcome_date_of_outcome", "MSF_date_consultation",
-                 "outcome_date_of_outcome", "Lab_date1",
-                 "outcome_submitted_date", "MSF_date_consultation",
-                 "outcome_submitted_date", "Lab_date1"),
+    flag = c(
+      rep("flag_upload_before_report", 2),
+      rep("flag_outcome_before_consult", 2)
+    ),
+    variable = c(
+      "upload_date", "report_date",
+      "outcome_date_of_outcome", "MSF_date_consultation"
+    ),
     value = TRUE, check_date = TRUE
   )
-  
   
   dat_date_flags <- dat_date %>%
     select(-value, -flag_ambiguous) %>%
     tidyr::spread(variable, date) %>% 
     mutate(
       flag_upload_before_report = upload_date < report_date,
-      # flag_report_before_onset = report_date < patcourse_dateonset,
-      # flag_report_before_expo_travel = report_date < expo_travel_date1,
-      # flag_report_before_expo_case = report_date < expo_case_date_first1,
-      # flag_lab1_before_expo_travel = Lab_date1 < expo_travel_date1,
-      # flag_lab1_before_expo_case = Lab_date1 < expo_case_date_first1,
       flag_outcome_before_consult = as.numeric(outcome_date_of_outcome - MSF_date_consultation) < -5,
-      # flag_outcome_before_lab1 = outcome_date_of_outcome < Lab_date1,
-      # flag_submit_before_consult = outcome_submitted_date < MSF_date_consultation,
-      # flag_submit_before_lab1 = outcome_submitted_date < Lab_date1
     ) %>% 
     select(db_row, patient_id, starts_with("flag")) %>% 
     tidyr::gather(flag, value, -db_row, -patient_id) %>% 
@@ -289,6 +278,15 @@ clean_linelist <- function(dat,
   
   if (nrow(check_categorical) > 0 & write_checks) {
     
+    ## archive current dictionary
+    file_out_archive <- glue::glue("dict_factors_correct_{time_stamp()}.xlsx")
+    
+    llct::write_simple_xlsx(
+      dict_factors_correct,
+      file = file.path(path_dictionaries, "archive", file_out_archive)
+    )
+    
+    ## update dictionary
     dict_factors_correct_write <- dict_factors_correct %>% 
       mutate(new = NA_character_)
     
@@ -334,12 +332,21 @@ clean_linelist <- function(dat,
     cols_base = country,
     count = TRUE
   ) %>% 
-    mutate(replacement1 = NA_character_) %>% 
+    mutate(replacement1 = guess_countrycode(value1)) %>% 
     select(value1, replacement1, variable1, country, n)
   
   # write to dict
   if (nrow(check_countries) > 0 & write_checks) {
     
+    ## archive current dictionary
+    file_out_archive <- glue::glue("dict_countries_correct_{time_stamp()}.xlsx")
+    
+    llct::write_simple_xlsx(
+      dict_countries_correct,
+      file = file.path(path_dictionaries, "archive", file_out_archive)
+    )
+    
+    ## update dictionary
     dict_countries_correct_write <- dict_countries_correct %>% 
       mutate(new = NA_character_)
     
