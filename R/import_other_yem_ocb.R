@@ -63,11 +63,10 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
 
   
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$the_test_result_negative_positive_not_done_pending, c("negative", "positive", NA))
+  test_set_equal(d_orig$the_test_result_negative_positive_not_done_pending, c("negative", "positive", "pending", NA))
   test_set_equal(d_orig$diagnostic_mechanism, c("ct.scan", "ct,scan", "chest.x-ray", "x-ray", NA))
   test_set_equal(d_orig$cardiovascular_disease_yes_no, c("yes", "no", NA))
   test_set_equal(d_orig$if_she_is_pregnant_in_which_month_no, c(NA)) # reassess derivation if values populated
-  
   
   ### Derivation for patcourse_asymp
   any_symptoms <- d_orig %>% 
@@ -138,7 +137,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate(across(c(outcome_status), tolower)) %>% 
     mutate(
       outcome_patcourse_status = case_when(
-        grepl("discharg", outcome_status) ~ "Sent back home",
+        grepl("disc", outcome_status) ~ "Sent back home",
         TRUE ~ outcome_status
       )
     )

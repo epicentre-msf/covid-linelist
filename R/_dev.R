@@ -11,14 +11,15 @@ source("R/geocode.R")
 # geo-match, and write resulting cleaned linelist files
 
 # focal country ISO code
-countries_update <- sort(c(countries, "BEL")) # update to include countries in linelist-other
+countries_update <- sort(c(countries, "BEL", "PAK")) # update to include countries in linelist-other
 
 ### Import non-Epicentre linelists
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
-# source("R/import_other_ssd_ocg.R") # temp solution
+source("R/import_other_pak_ocb.R")
+# source("R/import_other_ssd_ocg.R") # temp solution, these rows now in main export
 source("R/import_other_yem_ocb.R")
 source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
@@ -29,6 +30,7 @@ ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
+ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
 # ll_other_ssd_ocg <- import_other_ssd_ocg(path_linelist_other, dict_linelist) # these rows now in main export
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
@@ -36,8 +38,7 @@ ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist)
 
 
-
-### Import Epicentre-version linelists
+### Import MSF Intersectional linelists
 ll_import_epicentre <- purrr::map_dfr(
   countries_update,
   import_linelists,
@@ -49,6 +50,7 @@ ll_import_epicentre <- purrr::map_dfr(
 )
 
 
+
 ### Bind Epicentre and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
@@ -56,6 +58,7 @@ ll_import <- dplyr::bind_rows(
   ll_other_bel_ocb,
   ll_other_cod_oca,
   ll_other_hti_ocb,
+  ll_other_pak_ocb,
   # ll_other_ssd_ocg,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
@@ -65,21 +68,12 @@ ll_import <- dplyr::bind_rows(
 
 
 # check for missing values among important columns
-queryr::query(
-  ll_import,
-  is.na(.x),
-  cols_dotx = c(
-    "MSF_N_Patient",
-    "site",
-    "patient_id",
-    "linelist_lang",
-    "upload_date",
-    "country",
-    "shape"
-  ),
-  cols_base = c(country, OC)
-)
-
+queryr::query(ll_import, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(site), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(linelist_lang), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(upload_date), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(country), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE)
 
 
 # save raw country-specific RDS files
@@ -102,8 +96,6 @@ ll_cleaned <- ll_import %>%
       TRUE ~ expo_contact_case
     )
   ) %>% 
-  # CAF_E_BAT had wrong language in options sheet
-  # mutate(linelist_lang = ifelse(site == "CAF_E_BAT", "English", linelist_lang)) %>% 
   clean_linelist(
     path_dictionaries,
     path_corrections_dates,
@@ -113,9 +105,8 @@ ll_cleaned <- ll_import %>%
     dict_numeric_correct,
     dict_factors_correct,
     dict_countries_correct,
-    write_checks = TRUE
+    write_checks = FALSE
   )
-
 
 
 
@@ -138,20 +129,23 @@ ll_geocode <- purrr::map_dfr(
 )
 
 
-# ref <- fetch_georef("VEN")
+# ref <- fetch_georef("YEM")
 # 
 # ref %>%
-#   # filter(adm2 == "Douentza") %>%
-#   # filter(level == 3) %>%
-#   filter(grepl("campo", pcode, ignore.case = TRUE))
+#   filter(level == 1) %>% 
+#   filter(grepl("al dhal", adm1, ignore.case = TRUE)) %>% 
+#   print(n = 20)
+#   # filter(adm1 == "Miranda") %>%
+#   # filter(level == 1) %>%
+#   filter(grepl("sho", pcode, ignore.case = TRUE))
 
-
+  
 
 # check again for missing values among important columns
 queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC), count = TRUE)
+queryr::query(d_global, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
 
 
 purrr::walk(
@@ -162,9 +156,13 @@ purrr::walk(
 )
 
 
+
+
+
 ### Compile global linelist
 d_global <- list.files("local/final", pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
+  filter(!(OC == "OCA" & linelist_vers == "Go.Data")) %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
   arrange(site) %>% 
@@ -185,6 +183,8 @@ matchmaker::check_df(
 
 
 
+
+
 ### Write global export
 if (FALSE) {
   path_out_global <- file.path(path_export_global, glue("msf_covid19_linelist_global_{lubridate::today()}"))
@@ -195,10 +195,20 @@ if (FALSE) {
 
 
 
+### Country-specific exports
+purrr::walk(
+  unique(d_global$country),
+  write_ll_by_country,
+  d_global = d_global,
+  path_export_country = path_export_country
+)
+
+
+
+
 ### Write OC-specific files
 queryr::query(d_global, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(country, OC), count = TRUE)
-
 
 
 d_global_his <- d_global %>% 

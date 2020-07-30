@@ -96,7 +96,7 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   
   ### Constants and 1:1 mappings
   d_out <- d_derive %>% 
-    rename(all_of(vec_map_direct)) %>% 
+    map_columns(., vec_map_direct) %>% 
     select(-any_of(names(df_map_constant))) %>% # reassess
     dplyr::bind_cols(df_map_constant, .)
   

@@ -1,5 +1,49 @@
 
 
+write_ll_by_country <- function(country_focal,
+                                d_global,
+                                path_export_country,
+                                remove_empty_extra = TRUE) {
+  
+  out <- d_global %>% 
+    filter(country == country_focal)
+  
+  if (remove_empty_extra) {
+    extra_all <- grep("^extra__", names(d_global), value = TRUE)
+    
+    extra_retain <- d_global %>% 
+      select(starts_with("extra__")) %>% 
+      janitor::remove_empty("cols") %>% 
+      names()
+    
+    extra_rm <- setdiff(extra_all, extra_retain)
+    
+    out <- out %>% 
+      select(-all_of(extra_rm))
+  }
+  
+  if (!dir.exists(file.path(path_export_country, country_focal))) {
+    dir.create(file.path(path_export_country, country_focal))
+  }
+  
+  file_out <- glue::glue("msf_covid19_linelist_{country_focal}_{Sys.Date()}")
+  file_out_rds <- paste0(file_out, ".rds")
+  file_out_xlsx <- paste0(file_out, ".xlsx")
+  
+  saveRDS(out, file.path(path_export_country, country_focal, file_out_rds))
+  llu::write_simple_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
+}
+
+
+
+
+almost_empty_rows <- function(df, n_crit = 2, cols_exclude = NULL) {
+  df <- df[,!names(df) %in% cols_exclude]
+  ncol(df) - rowSums(is.na(df)) < n_crit
+}
+
+
+
 #' Guess ISO3 country code by converting from iso2c and country.name
 guess_countrycode <- function(x) {
   x1 = countrycode::countrycode(x, "iso2c", "iso3c", warn = FALSE)
@@ -378,11 +422,11 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   }
   
   queries_resolved <- queries_out %>% 
-    filter(resolved_auto == "Yes") %>% 
+    filter(resolved_auto %in% c("Yes", "Resolved", "Removed")) %>% 
     mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
   
   queries_outstanding <- queries_out %>% 
-    filter(resolved_auto == "No") %>% 
+    filter(resolved_auto %in% c("No", "Unresolved")) %>% 
     mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
   
   queries_summary <- queries_out %>% 
@@ -390,22 +434,27 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
     summarize(n_total = n(), .groups = "drop") %>% 
     tidyr::pivot_wider(names_from = "resolved_auto", values_from = "n_total", values_fill = 0)
   
-  if (!"Yes" %in% names(queries_summary)) {
-    queries_summary$Yes <- 0L
+  if (!"Removed" %in% names(queries_summary)) {
+    queries_summary$Removed <- rep(0L, nrow(queries_summary))
   }
   
-  if (!"No" %in% names(queries_summary)) {
-    queries_summary$No <- 0L
+  if (!"Resolved" %in% names(queries_summary)) {
+    queries_summary$Resolved <- rep(0L, nrow(queries_summary))
+  }
+  
+  if (!"Unresolved" %in% names(queries_summary)) {
+    queries_summary$Unresolved <- rep(0L, nrow(queries_summary))
   }
   
   queries_summary <- queries_summary %>% 
-    mutate(total = Yes + No) %>% 
+    mutate(total = Removed + Resolved + Unresolved) %>% 
     arrange(desc(total)) %>% 
     select(Category = category,
            `Query ID` = query_id,
            `N Total` = total,
-           `N Resolved` = Yes,
-           `N Outstanding` = No,
+           `N Removed` = Removed,
+           `N Resolved` = Resolved,
+           `N Outstanding` = Unresolved,
            Description = description)
   
   header_recode <- c(
@@ -483,7 +532,7 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   openxlsx::addStyle(wb, 3, style = hs, rows = 1, cols = 1:ncol(queries_summary), gridExpand = TRUE)
   openxlsx::addStyle(wb, 3, style = la, rows = 2:(nrow(queries_summary) + 1L), cols = 1:ncol(queries_summary), gridExpand = TRUE)
   openxlsx::setColWidths(wb, 3, cols = 1:ncol(queries_summary),
-                         widths = c(21, 14, 12, 12, 12, 110))
+                         widths = c(21, 14, 12, 12, 12, 12, 110))
   
   suppressMessages(
     openxlsx::saveWorkbook(

@@ -27,6 +27,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
   
   ## initial import
   path_to_files <- file.path(path_linelist_other, "OCBA", "BGD")
+  path_to_files_oca <- file.path(path_linelist_other, "OCA", "BGD")
   
   files_ll <- c(
     BGD_E_UMS = llu::list_files(
@@ -38,8 +39,18 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
       path_to_files,
       pattern = "COVID19_Goyalmara.*\\.xlsx",
       select = "latest"
+    ),
+    BGD_A_KUT = llu::list_files(
+      path_to_files_oca,
+      pattern = "BGD_CXB_KTP.*\\.xlsx",
+      select = "latest"
+    ),
+    BGD_A_BAL = llu::list_files(
+      path_to_files_oca,
+      pattern = "BGD_CXB_BKL.*\\.xlsx",
+      select = "latest"
     )
-  ) 
+  )
   
   d_orig <- purrr::map2_dfr(
     files_ll,
@@ -53,6 +64,8 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
   )
   
   ## mapping file
+  map_occupations <- readxl::read_xlsx(file.path(path_to_files, "map_occupations.xlsx"))
+  
   df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_go_data.xlsx") %>% 
     readxl::read_xlsx() %>% 
     select(1, 7, 8, 9, 10) %>% 
@@ -100,7 +113,8 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
   
   extra__secondary_comcond_at_discharge <- d_orig %>% 
     select(starts_with("secondary_co_morbidities_at_discharge")) %>% 
-    pmap_chr(., collapse_unique, to_chr =  TRUE)
+    pmap_chr(., collapse_unique, to_chr =  TRUE) %>% 
+    dplyr::na_if("NA")
   
   d_derive <- d_orig %>% 
     # patinfo_ageonset (if both ages 0, should be NA?)
@@ -118,6 +132,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
     mutate(across(addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, ~ ifelse(is.na(.x), "", .x))) %>%
     unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, sep = " | ") %>% 
     # MSF_job
+    hmatch(map_occupations) %>% 
     # MSF_symptom_aches
     mutate(MSF_symptom_aches = case_when(
       muscle_ache %in% "Yes" | joint_ache %in% "Yes" ~ "Yes",
@@ -186,7 +201,6 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
     ### extra
     mutate(extra__secondary_comcond_at_discharge = extra__secondary_comcond_at_discharge)
   
-  
   ### Constants and 1:1 mappings
   d_out <- d_derive %>% 
     map_columns(., vec_map_direct) %>% 
@@ -250,6 +264,8 @@ import_go_data_ <- function(path, site) {
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>% 
     janitor::remove_empty("rows") %>% 
+    # following line is a quick hack to remove WHO CRF entries for OCA, which mostly (possibly completely) overlap with data in intersectional LL
+    filter(!is.na(`_Select your agency`)) %>% 
     mutate(linelist_row = 1:n(),
            upload_date = as.character(llu::extract_date(path)),
            linelist_lang = "English",

@@ -26,7 +26,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "BGD"
+    country <- "COD"
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -173,7 +173,8 @@ read_and_prepare_data <- function(file_path,
                                   dict_extra_vars,
                                   dict_linelist,
                                   dict_vars_exclude,
-                                  cols_derive) {
+                                  cols_derive,
+                                  remove_almost_empty = TRUE) {
 
   ## requires
   library(dplyr)
@@ -190,8 +191,13 @@ read_and_prepare_data <- function(file_path,
     file_path,
     sheet = "linelist",
     col_types = "text",
+    na = c("", "NA"),
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   )
+  
+  if (remove_almost_empty) {
+    df <- df[!almost_empty_rows(df, n_crit = 3), , drop = FALSE]
+  }
   
   ## get linelist version and language
   df_meta <- get_site_meta(file_path)
