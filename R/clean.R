@@ -371,8 +371,21 @@ clean_linelist <- function(dat,
   )
   
   
+  ### Update patcourse_admit and patcourse_presHCF
+  dat_out <- dat_countries_clean %>% 
+    mutate(
+      patcourse_admit = case_when(
+        MSF_visit_type %in% c("Admission to isolation center", "First hospitalisation", "First hospitalisation after a consultation", "Rehospitalisation") ~ "Yes",
+        TRUE ~ patcourse_admit
+      ),
+      patcourse_presHCF = case_when(
+        patcourse_admit == "Yes" & is.na(patcourse_presHCF) ~ MSF_date_consultation,
+        TRUE ~ patcourse_presHCF
+      )
+    )
+  
   ### return
-  return(dat_countries_clean)
+  return(dat_out)
 }
 
 
