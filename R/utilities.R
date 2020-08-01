@@ -1,5 +1,19 @@
 
 
+#' Turn vector into dput-like output, for use in warnings and errors
+#' @noRd
+vec_paste_c <- function(x) {
+  len_x <- length(x)
+  x[!is.na(x)] <- dQuote(x[!is.na(x)], q = FALSE)
+  x <- paste(x, collapse = ", ")
+  if (len_x > 1) {
+    x <- paste0("c(", x, ")")
+  }
+  x
+}
+
+
+
 write_ll_by_country <- function(country_focal,
                                 d_global,
                                 path_export_country,

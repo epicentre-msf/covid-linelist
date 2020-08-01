@@ -38,6 +38,7 @@ ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist)
 
 
+
 ### Import MSF Intersectional linelists
 ll_import_epicentre <- purrr::map_dfr(
   countries_update,
@@ -45,11 +46,8 @@ ll_import_epicentre <- purrr::map_dfr(
   path_data_raw = path_data_raw,
   dict_facilities = dict_facilities,
   dict_linelist = dict_linelist,
-  dict_extra_vars = dict_extra_vars,
-  dict_vars_exclude = dict_vars_exclude
+  dict_extra_vars = dict_extra_vars
 )
-
-
 
 ### Bind Epicentre and Other imports
 ll_import <- dplyr::bind_rows(

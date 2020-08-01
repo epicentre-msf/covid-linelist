@@ -55,8 +55,6 @@ dict_date_categories <- read_xlsx(file.path(path_dictionaries, "dict_date_catego
 dict_numeric_correct <- read_xlsx(file.path(path_dictionaries, "dict_numeric_correct.xlsx"))
 dict_factors_correct <- read_xlsx(file.path(path_dictionaries, "dict_factors_correct.xlsx"))
 dict_countries_correct <- read_xlsx(file.path(path_dictionaries, "dict_countries_correct.xlsx"))
-dict_vars_exclude <- read_xlsx(file.path(path_dictionaries, "dict_vars_exclude.xlsx"))
-
 date_vars <- c("upload_date", dict_linelist$code_name[dict_linelist$data_type == "Date"])
 
 

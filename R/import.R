@@ -6,7 +6,6 @@
 #'   project) to site codes
 #' @param dict_linelist Main linelist dictionary
 #' @param dict_extra_vars Dictionary for renaming additional variables
-#' @param dict_vars_exclude Dictionary of empty variables exported from v2
 #'
 #' @return
 #' Combined linelist <tibble> created by binding together the most recent
@@ -17,8 +16,7 @@ import_linelists <- function(country,
                              path_data_raw,
                              dict_facilities,
                              dict_linelist,
-                             dict_extra_vars,
-                             dict_vars_exclude) {
+                             dict_extra_vars) {
   
   ## requires
   library(dplyr)
@@ -26,7 +24,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "COD"
+    country <- "VEN"
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -61,7 +59,6 @@ import_linelists <- function(country,
         site = .$site,
         dict_linelist = dict_linelist,
         dict_extra_vars = dict_extra_vars,
-        dict_vars_exclude = dict_vars_exclude,
         cols_derive = cols_derive
       )
     ) %>%
@@ -172,21 +169,23 @@ read_and_prepare_data <- function(file_path,
                                   site,
                                   dict_extra_vars,
                                   dict_linelist,
-                                  dict_vars_exclude,
                                   cols_derive,
-                                  remove_almost_empty = TRUE) {
+                                  remove_almost_empty = TRUE,
+                                  warn_recoded = FALSE) {
 
   ## requires
   library(dplyr)
   library(janitor)
   source("R/utilities.R")
   
+  ## only for running manually
   if (FALSE) {
     file_path <- df_sheets$file_path[1]
-    site <- df_sheets$file_path[1]
+    site <- df_sheets$site[1]
+    remove_almost_empty = TRUE
   }
   
-  ## read linelist from relevant excel sheet
+  ## read linelist
   df <- readxl::read_xlsx(
     file_path,
     sheet = "linelist",
@@ -195,56 +194,69 @@ read_and_prepare_data <- function(file_path,
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   )
   
+  ## remove rows with 3 or fewer non-missing values
   if (remove_almost_empty) {
     df <- df[!almost_empty_rows(df, n_crit = 3), , drop = FALSE]
   }
   
-  ## get linelist version and language
-  df_meta <- get_site_meta(file_path)
+  ## regex for columns to ignore
+  regex_exclude <- c(
+    "^0\\.\\.",
+    "^X0",
+    "^Añadir el nombre",
+    "^Ajouter le nom",
+    "^Add variable name",
+    "^MSF_variable_additional",
+    "^MSF_test_type_detail",
+    "^MSF_lab_date_[2-4]",
+    "^MSF_lab_name_[2-4]", 
+    "^MSF_sample_type_[2-4]",
+    "^MSF_test_type_[2-4]",
+    "^MSF_test_results_[2-4]",
+    "^MSF_test_other_date",
+    "^MSF_test_other_type", 
+    "^MSF_test_other_result",
+    "^MSF_tb_type",
+    "^MSF_outcome_ICU_days", 
+    "^MSF_outcome_ventilated_days",
+    "^MSF_home_base_care",
+    "^MSF_former_status", 
+    "^MSF_next status"
+  )
   
-  if (nrow(df) > 0) {
-    # ## check for column names beginning with ".." (missing name in excel file)
-    # if (any(grepl("^0", names(df)))) {
-    #   stop("Missing column names in file ", file_path)
-    # }
+  ## prepare output
+  out_prep <- df %>% 
+    select(-matches(paste(regex_exclude, collapse = "|"))) %>%
+    mutate_all(as.character) %>% 
+    janitor::remove_empty("rows") %>%
+    mutate(linelist_row = seq_len(n()), .before = 1)
+  
+  ## add linelist version and language
+  site_meta <- get_site_meta(file_path)
+  out_prep$linelist_lang <- rep(site_meta$linelist_lang, nrow(out_prep))
+  out_prep$linelist_vers <- rep(site_meta$linelist_vers, nrow(out_prep))
+  
+  ## rename additional variables
+  ll_template <- dict_linelist$code_name
+  ll_template <- ll_template[!grepl("^MSF_variable_additional", ll_template)]
+  
+  out <- out_prep %>% 
+    dplyr::rename_with(.fn = recode_columns, dict_extra_vars = dict_extra_vars)
+  
+  ## check for new additional variable columns to be automatically renamed
+  extra_cols <- grep("^extra__", names(out), value = TRUE)
+  new_cols <- setdiff(names(out), c(cols_derive, ll_template, extra_cols))
+  
+  if (length(new_cols) > 0) {
+    out <- out %>% 
+      dplyr::rename(!!!setNames(new_cols, paste0("extra__", hmatch::string_std(new_cols))))
     
-    ## remove empty rows/cols, recode column names, and add linelist row number
-    out <- df %>% 
-      dplyr::as_tibble() %>% 
-      select(-starts_with("0")) %>%
-      mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
-      mutate_all(as.character) %>% 
-      janitor::remove_empty(which = c("rows")) %>%
-      dplyr::rename_with(., .fn = recode_columns, dict_extra_vars = dict_extra_vars) %>%
-      mutate(linelist_row = seq_len(n())) %>% 
-      select(linelist_row, everything()) %>% 
-      bind_cols(df_meta, .)
-    
-    
-    ## columns to add (from original ll template)
-    ll_template <- dict_linelist$code_name
-    ll_template <- ll_template[!grepl("^MSF_variable_additional", ll_template)]
-    # cols_to_add <- setdiff(ll_template, names(out))
-    # df_data[cols_to_add] <- NA_character_
-    
-    # check for new columns to be manually renamed
-    extra_cols <- grep("^extra__", names(out), value = TRUE)
-    new_cols <- setdiff(names(out), c(cols_derive, ll_template, extra_cols))
-    
-    # remove unnecessary columns
-    pref_exclude <- "^0\\.\\.|^X0|^Añadir el nombre|^Ajouter le nom|^Add variable name|^MSF_variable_additional"
-    new_cols <- new_cols[!grepl(pref_exclude, new_cols)]
-    new_cols <- setdiff(new_cols, dict_vars_exclude[[1]])
-    
-    # arrange cols
-    if (length(new_cols) > 0) {
-      message("New linelist columns to rename for site ", site, ":\n", paste(new_cols, collapse = "\n"))
+    # print column names automatically recoded as 'extra__'
+    if (warn_recoded & length(new_cols) > 0) {
+      message("New extra__ linelist columns for site ", site, ": ", vec_paste_c(new_cols))
     }
-    
-  } else {
-    out <- tibble(linelist_row = integer(0))
   }
-
+  
   out
 }
 
