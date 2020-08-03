@@ -36,7 +36,7 @@ clean_linelist <- function(dat,
 
   ## if running manually
   if (FALSE) {
-    dat <- ll_cleaned
+    dat <- ll_import
     write_checks <- TRUE
   }
   
@@ -70,8 +70,8 @@ clean_linelist <- function(dat,
   
   if (length(comcond_bad) > 0) {
     dat$Comcond_present <- comcond_n
-    message("The following values of Comcond_present will be re-calculated: ",
-            paste(unique(comcond_bad), collapse = "; "))
+    # message("The following values of Comcond_present will be re-calculated: ",
+    #         paste(unique(comcond_bad), collapse = "; "))
   }
   
   
@@ -164,7 +164,7 @@ clean_linelist <- function(dat,
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     arrange(db_row, patient_id) %>% 
     mutate(date = suppressWarnings(parse_excel_dates(value)),
-           date = parse_other_dates(date),
+           date = suppressWarnings(parse_other_dates(date)),
            date = as.Date(date))
   
   dat_date <- dat_date %>% 
@@ -365,7 +365,7 @@ clean_linelist <- function(dat,
   
   
   ### Calculate age in years
-  dat_countries_clean$age_in_years <- llutils::age_to_years(
+  dat_countries_clean$age_in_years <- llutils::age_in_years(
     dat_countries_clean$patinfo_ageonset,
     dat_countries_clean$patinfo_ageonsetunit
   )

@@ -14,7 +14,7 @@ source("R/compare.R")
 # focal country ISO code
 countries_update <- sort(c(countries, "BEL", "PAK")) # update to include countries in linelist-other
 
-### Import non-Epicentre linelists
+### Import non-intersectional linelists
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
@@ -49,7 +49,7 @@ ll_import_epicentre <- purrr::map_dfr(
 )
 
 
-### Bind Epicentre and Other imports
+### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
   ll_other_afg_tri,
@@ -124,6 +124,7 @@ ll_geocode <- purrr::map_dfr(
   path_shapefiles = path_shapefiles,
   write_checks = TRUE
 )
+
 
 
 # ref <- fetch_georef("YEM")
