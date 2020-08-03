@@ -144,8 +144,14 @@ queries_categorical <- function(dat_raw,
     query_match_dict(dat_prep, dict_factors, lang = "es"),
     query_match_dict(dat_prep, dict_factors, lang = "fr")
   ) %>% 
-    anti_join(categ_query_exclude, by = c("variable1", "value1")) # %>% 
-    # count(variable1, value1, sort = TRUE)
+    # use hmatch rather than dplyr::anti_join to allow variation in case
+    hmatch::hmatch(
+      categ_query_exclude,
+      by = c("variable1", "value1"),
+      allow_gaps = FALSE,
+      type = "anti",
+      std_fn = tolower
+    )
   
   # CATEG_02 Country value does not match valid ISO3 country code
   # strict for vars report_country and patinfo_idadmin0; relaxed for others of data type Sting free text
@@ -194,9 +200,12 @@ queries_multi <- function(dat_raw, dat_clean) {
   # MULTI_05 Trimester of pregnancy is given (excluding "Unknown") but Pregnancy is not "Yes"
   queries[["MULTI_05"]] <- query(dat_clean, !Comcond_pregt %in% c("Unknown", NA) & !Comcond_preg %in% "Yes")
   
-  # MULTI_06 CD4 count or HIV viral load given but HIV status not a form of "Positive..."
-  vars_hiv <- c("MSF_hiv_cd4", "MSF_hiv_viral_load")
-  queries[["MULTI_06"]] <- query(dat_clean, !is.na(.x) & !grepl("posit", MSF_hiv_status, ignore.case = TRUE), cols_dotx = all_of(vars_hiv))
+  # MULTI_06 CD4 count or HIV viral load given (excluding 'Unknown') but HIV status not a form of "Positive..."
+  queries[["MULTI_06"]] <- query(
+    dat_clean,
+    !is.na(.x) & !tolower(.x) %in% c("inconnu", "unknown") & !grepl("posit", MSF_hiv_status, ignore.case = TRUE),
+    cols_dotx = all_of(c("MSF_hiv_cd4", "MSF_hiv_viral_load"))
+  )
   
   # MULTI_07 Hypertension is "Yes" but Cardiovascular disease (incl. hypertension) is not "Yes"
   queries[["MULTI_07"]] <- query(dat_clean, MSF_hypertension == "Yes" & !Comcond_cardi %in% "Yes")
@@ -294,6 +303,11 @@ queries_multi <- function(dat_raw, dat_clean) {
   # queries[["MULTI_33"]] <- query(dat_clean, MSF_visit_type %in% c("First hospitalisation after a consultation", "Rehospitalisation") & is.na(MSF_former_ID_readmission))
   
   
+  # MULTI_36 Asymptomatic is 'Yes' but some symptoms are recorded as 'Yes'
+  cols_symptom <- grep("MSF_symptom(?!.*date_onset$)", value = TRUE, names(dat_clean), perl = TRUE)
+  queries[["MULTI_36"]] <- query(dat_clean, patcourse_asymp == "Yes" & .x == "Yes", cols_dotx = all_of(cols_symptom))
+  
+  
   return(bind_query_list(queries))
 }
 
@@ -310,8 +324,8 @@ queries_other <- function(dat_raw, dat_clean) {
     "patinfo_sex",
     "MSF_covid_status",
     # "Lab_date1",
-    "MSF_visit_type"
-    # "MSF_date_consultation",
+    "MSF_visit_type",
+    "MSF_date_consultation"
     # "outcome_patcourse_status",
     # "outcome_date_of_outcome"
   )
