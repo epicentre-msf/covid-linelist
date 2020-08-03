@@ -31,7 +31,7 @@ clean_geo <- function(country,
   }
   
   ## read cleaned data
-  dat <- readRDS(glue("local/clean/ll_covid_cleaned_{country}.rds"))
+  dat <- readRDS(file.path("local", "clean", glue::glue("ll_covid_cleaned_{country}.rds")))
   
   ## shape
   shape <- unique(dat$shape)

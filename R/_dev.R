@@ -19,7 +19,6 @@ source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
 source("R/import_other_pak_ocb.R")
-# source("R/import_other_ssd_ocg.R") # temp solution, these rows now in main export
 source("R/import_other_yem_ocb.R")
 source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
@@ -31,7 +30,6 @@ ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
-# ll_other_ssd_ocg <- import_other_ssd_ocg(path_linelist_other, dict_linelist) # these rows now in main export
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
@@ -58,7 +56,6 @@ ll_import <- dplyr::bind_rows(
   ll_other_cod_oca,
   ll_other_hti_ocb,
   ll_other_pak_ocb,
-  # ll_other_ssd_ocg,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
   ll_other_yem_pra,
@@ -113,7 +110,7 @@ purrr::walk(
   sort(unique(ll_cleaned$country)),
   write_by_country,
   dat = ll_cleaned,
-  path_prefix = "local/clean/ll_covid_cleaned_"
+  path_prefix = file.path("local", "clean", "ll_covid_cleaned_")
 )
 
 
@@ -151,15 +148,14 @@ purrr::walk(
   countries_update,
   write_by_country,
   dat = ll_geocode,
-  path_prefix = "local/final/msf_covid19_linelist_"
+  path_prefix = file.path("local", "final", "msf_covid19_linelist_")
 )
 
 
 
 
-
 ### Compile global linelist
-d_global <- list.files("local/final", pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
+d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
   filter(!(OC == "OCA" & linelist_vers == "Go.Data")) %>% 
   select(-starts_with("MSF_variable_additional")) %>%
@@ -186,7 +182,7 @@ matchmaker::check_df(
 
 ### Write global export
 if (FALSE) {
-  path_out_global <- file.path(path_export_global, glue("msf_covid19_linelist_global_{lubridate::today()}"))
+  path_out_global <- file.path(path_export_global, glue::glue("msf_covid19_linelist_global_{lubridate::today()}"))
   llutils::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
   saveRDS(d_global, paste0(path_out_global, ".rds"))
 }

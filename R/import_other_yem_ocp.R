@@ -20,7 +20,7 @@ import_other_yem_ocp <- function(path_linelist_other, dict_linelist) {
   source("R/import_other_yem_ocp.R")
   
   file_sana <- llutils::list_files(
-    path = file.path(path_linelist_other, "OCP/YEM"),
+    path = file.path(path_linelist_other, "OCP", "YEM"),
     pattern = "Sana.*\\.xlsm",
     ignore.case = TRUE,
     full.names = TRUE,
@@ -28,7 +28,7 @@ import_other_yem_ocp <- function(path_linelist_other, dict_linelist) {
   )
   
   file_aden <- llutils::list_files(
-    path = file.path(path_linelist_other, "OCP/YEM"),
+    path = file.path(path_linelist_other, "OCP", "YEM"),
     pattern = "Aden.*\\.xlsm",
     ignore.case = TRUE,
     full.names = TRUE,
