@@ -4,6 +4,7 @@ source("R/zzz.R")
 source("R/import.R")
 source("R/clean.R")
 source("R/geocode.R")
+source("R/compare.R")
 
 
 ### Clean/compile country-specific linelists
@@ -211,6 +212,7 @@ d_global_his <- d_global %>%
   mutate(
     MSF_main_diagnosis = recode(
       MSF_main_diagnosis,
+      # recode … because causes problems for HIS import
       "Chronic lung disease (asthma, COPD…)" = "Chronic lung disease (asthma, COPD, etc)"
     )
   ) %>% 
@@ -223,7 +225,7 @@ OC_list <- unique(d_global_his$OC)
 
 if (FALSE) {
   for (OC_focal in OC_list) {
-    file_out_oc <- glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
+    file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
     
     # HIS-export
     d_oc_his <- filter(d_global_his, OC == OC_focal)
@@ -234,7 +236,11 @@ if (FALSE) {
     d_oc_foc <- filter(d_global, OC == OC_focal)
     path_out2_oc <- file.path(path_export_fp, OC_focal, file_out_oc)
     llutils::write_simple_xlsx(d_oc_foc, path_out2_oc)
+    
+    # patient_id losses
+    df_oc_compare <- compare_ids(OC, path_export = path_export)
+    path_out3_oc <- file.path(path_export, OC, glue::glue("patient_id_losses_{tolower(OC)}_{Sys.Date()}.xlsx"))
+    llutils::write_simple_xlsx(df_oc_compare, file = path_out3_oc, group = compilation_date)
   }
 }
-
 
