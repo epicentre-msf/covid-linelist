@@ -30,22 +30,22 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
   path_to_files_oca <- file.path(path_linelist_other, "OCA", "BGD")
   
   files_ll <- c(
-    BGD_E_UMS = llu::list_files(
+    BGD_E_UMS = llutils::list_files(
       path_to_files,
       pattern = "COVID19_UMS.*\\.xlsx",
       select = "latest"
     ),
-    BGD_E_GOY = llu::list_files(
+    BGD_E_GOY = llutils::list_files(
       path_to_files,
       pattern = "COVID19_Goyalmara.*\\.xlsx",
       select = "latest"
     ),
-    BGD_A_KUT = llu::list_files(
+    BGD_A_KUT = llutils::list_files(
       path_to_files_oca,
       pattern = "BGD_CXB_KTP.*\\.xlsx",
       select = "latest"
     ),
-    BGD_A_BAL = llu::list_files(
+    BGD_A_BAL = llutils::list_files(
       path_to_files_oca,
       pattern = "BGD_CXB_BKL.*\\.xlsx",
       select = "latest"
@@ -267,7 +267,7 @@ import_go_data_ <- function(path, site) {
     # following line is a quick hack to remove WHO CRF entries for OCA, which mostly (possibly completely) overlap with data in intersectional LL
     filter(!is.na(`_Select your agency`)) %>% 
     mutate(linelist_row = 1:n(),
-           upload_date = as.character(llu::extract_date(path)),
+           upload_date = as.character(llutils::extract_date(path)),
            linelist_lang = "English",
            linelist_vers = "Go Data",
            site = site)

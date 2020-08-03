@@ -18,7 +18,7 @@ clean_geo <- function(country,
   library(dplyr)
   library(tidyr)
   library(glue)
-  library(llct)
+  library(llutils)
   library(janitor)
   library(hmatch)
   source("R/geocode.R")
@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "AFG"
+    country <- "BRA"
     write_checks <- TRUE
   }
   
@@ -63,7 +63,7 @@ clean_geo <- function(country,
     df_geo_ref <- readRDS(georef_file)
     
     ## manual corrections
-    file_recode <- llu::list_files(
+    file_recode <- llutils::list_files(
       path_corrections_geocodes,
       pattern = paste0("geocodes_recode", shape),
       full.names = TRUE,
@@ -76,7 +76,7 @@ clean_geo <- function(country,
       NULL
     }
     
-    df_manual_check_full <- llu::list_files(
+    df_manual_check_full <- llutils::list_files(
       path_corrections_geocodes,
       pattern = paste0("geocodes_check_", shape),
       full.names = TRUE
@@ -139,7 +139,7 @@ clean_geo <- function(country,
       if (nrow(df_manual_check_full) > 0) {
         file_out_archive <- glue::glue("geocodes_check_{shape}_{time_stamp()}.xlsx")
         
-        llct::write_simple_xlsx(
+        llutils::write_simple_xlsx(
           df_manual_check_full,
           file = file.path(path_corrections_geocodes, "archive", file_out_archive),
           group = level_raw
@@ -159,7 +159,7 @@ clean_geo <- function(country,
       
       file_out <- glue::glue("geocodes_check_{shape}.xlsx")
       
-      llct::write_simple_xlsx(
+      llutils::write_simple_xlsx(
         dict_geo_out,
         file = file.path(path_corrections_geocodes, file_out),
         group = level_raw

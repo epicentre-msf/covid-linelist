@@ -41,7 +41,7 @@ import_other_bel_ocb <- function(path_linelist_other, dict_linelist) {
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
   
-  file_ll <- llu::list_files(
+  file_ll <- llutils::list_files(
     path_to_files,
     pattern = "TT linelist.*\\.xlsx",
     ignore.case = TRUE,
@@ -58,7 +58,7 @@ import_other_bel_ocb <- function(path_linelist_other, dict_linelist) {
     janitor::clean_names() %>% 
     mutate(site = "BEL_B_TOU") %>% 
     dplyr::left_join(dict_facilities_join, by = "site") %>% 
-    mutate(upload_date = as.character(llu::extract_date(file_ll)))
+    mutate(upload_date = as.character(llutils::extract_date(file_ll)))
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$substance_abuse, c("yes", "no", NA))

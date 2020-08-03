@@ -26,11 +26,11 @@ clean_linelist <- function(dat,
                            write_checks) {
 
   ## requires
-  library(dplyr)
-  library(tidyr)
-  library(glue)
-  library(repi)
-  library(matchmaker)
+  library(dplyr, warn.conflicts = FALSE)
+  library(tidyr, warn.conflicts = FALSE)
+  library(glue, warn.conflicts = FALSE)
+  library(repi, warn.conflicts = FALSE)
+  library(matchmaker, warn.conflicts = FALSE)
   source("R/clean.R")
   source("R/utilities.R")
 
@@ -105,7 +105,7 @@ clean_linelist <- function(dat,
     ## archive current dictionary
     file_out_archive <- glue::glue("dict_numeric_correct_{time_stamp()}.xlsx")
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dict_numeric_correct,
       file = file.path(path_dictionaries, "archive", file_out_archive)
     )
@@ -120,7 +120,7 @@ clean_linelist <- function(dat,
       mutate(new = NA_character_) %>% 
       bind_rows(check_numeric_append)
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dict_numeric_correct_out,
       file = file.path(path_dictionaries, glue("dict_numeric_correct.xlsx"))
     )
@@ -228,7 +228,7 @@ clean_linelist <- function(dat,
   ## check for non-missing values not converted to date
   if (nrow(dates_check) > 0 & write_checks) {
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dates_check,
       file = file.path(path_corrections_dates, glue("dates_check_compiled_{time_stamp()}.xlsx")),
       group = patient_id
@@ -281,7 +281,7 @@ clean_linelist <- function(dat,
     ## archive current dictionary
     file_out_archive <- glue::glue("dict_factors_correct_{time_stamp()}.xlsx")
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dict_factors_correct,
       file = file.path(path_dictionaries, "archive", file_out_archive)
     )
@@ -295,7 +295,7 @@ clean_linelist <- function(dat,
       bind_rows(dict_factors_correct_write, .) %>% 
       arrange(language, rev(new))
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dict_factors_out,
       file = file.path(path_dictionaries, glue("dict_factors_correct.xlsx"))
     )
@@ -326,9 +326,9 @@ clean_linelist <- function(dat,
   dat_countries_clean <- dat_factors_english %>%
     matchmaker::match_df(dict_countries_correct)
   
-  check_countries <- llct::query(
+  check_countries <- queryr::query(
     dat_countries_clean, !.x %in% c(dict_countries$iso, NA_character_),
-    cols_cond = all_of(vars_country),
+    cols_dotx = all_of(vars_country),
     cols_base = country,
     count = TRUE
   ) %>% 
@@ -341,7 +341,7 @@ clean_linelist <- function(dat,
     ## archive current dictionary
     file_out_archive <- glue::glue("dict_countries_correct_{time_stamp()}.xlsx")
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dict_countries_correct,
       file = file.path(path_dictionaries, "archive", file_out_archive)
     )
@@ -355,7 +355,7 @@ clean_linelist <- function(dat,
       bind_rows(dict_countries_correct_write, .) %>% 
       arrange(rev(new))
     
-    llct::write_simple_xlsx(
+    llutils::write_simple_xlsx(
       dict_countries_out,
       file = file.path(path_dictionaries, glue("dict_countries_correct.xlsx"))
     )
@@ -365,7 +365,7 @@ clean_linelist <- function(dat,
   
   
   ### Calculate age in years
-  dat_countries_clean$age_in_years <- llct::age_to_years(
+  dat_countries_clean$age_in_years <- llutils::age_to_years(
     dat_countries_clean$patinfo_ageonset,
     dat_countries_clean$patinfo_ageonsetunit
   )

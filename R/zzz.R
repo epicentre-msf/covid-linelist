@@ -1,14 +1,14 @@
 
 ### Required libraries
-library(tidyverse)
-library(here)
-library(readxl)
-library(stringr)
-library(janitor)
-library(glue)
-library(matchmaker) # remotes::install.github("patrickbarks/matchmaker")
-library(hmatch)     # remotes::install.github("epicentre-msf/hmatch")
-library(llu)     # remotes::install.github("epicentre-msf/llu")
+library(tidyverse, warn.conflicts = FALSE)
+library(here, warn.conflicts = FALSE)
+library(readxl, warn.conflicts = FALSE)
+library(stringr, warn.conflicts = FALSE)
+library(janitor, warn.conflicts = FALSE)
+library(glue, warn.conflicts = FALSE)
+library(matchmaker, warn.conflicts = FALSE)    # remotes::install.github("patrickbarks/matchmaker")
+library(hmatch, warn.conflicts = FALSE)        # remotes::install.github("epicentre-msf/hmatch")
+library(llutils, warn.conflicts = FALSE)       # remotes::install.github("epicentre-msf/llutils")
 source("R/utilities.R")
 
 

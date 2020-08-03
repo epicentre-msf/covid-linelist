@@ -19,8 +19,10 @@ import_linelists <- function(country,
                              dict_extra_vars) {
   
   ## requires
-  library(dplyr)
-  library(hmatch)
+  library(dplyr, warn.conflicts = FALSE)
+  library(purrr, warn.conflicts = FALSE)
+  library(tidyr, warn.conflicts = FALSE)
+  library(hmatch, warn.conflicts = FALSE)
   source("R/import.R")
   
   if (FALSE) {
@@ -34,38 +36,40 @@ import_linelists <- function(country,
   if (nrow(df_sheets) == 0) return(NULL)
   
   ## derived columns
-  cols_derive <- c("db_row",
-                   "linelist_row",
-                   "upload_date",
-                   "linelist_lang",
-                   "linelist_vers",
-                   "country",
-                   "shape",
-                   "OC",
-                   "project",
-                   "site_type",
-                   "site_name",
-                   "site",
-                   "uid",
-                   "MSF_N_Patient",
-                   "patient_id")
+  cols_derive <- c(
+    "db_row",
+    "linelist_row",
+    "upload_date",
+    "linelist_lang",
+    "linelist_vers",
+    "country",
+    "shape",
+    "OC",
+    "project",
+    "site_type",
+    "site_name",
+    "site",
+    "uid",
+    "MSF_N_Patient",
+    "patient_id"
+  )
 
   ## import and prepare
-  df_data <- df_sheets %>%
-    group_by(country, shape, OC, project, site_type, site_name, site, uid, upload_date) %>% 
-    do(
-      read_and_prepare_data(
-        file_path = .$file_path,
-        site = .$site,
+  df_data <- df_sheets %>% 
+    mutate(
+      df = purrr::map2(
+        file_path,
+        site,
+        read_and_prepare_data,
         dict_linelist = dict_linelist,
         dict_extra_vars = dict_extra_vars,
         cols_derive = cols_derive
       )
-    ) %>%
-    ungroup() %>% 
+    ) %>% 
+    select(-file_path) %>% 
+    tidyr::unnest("df") %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
-  
   
   ## columns to add (from original ll template)
   ll_template <- dict_linelist$code_name
@@ -98,9 +102,10 @@ scan_sheets <- function(path_data_raw,
                         return_latest = TRUE) {
 
   ## requires
-  library(dplyr)
-  library(tidyr)
-  library(glue)
+  library(dplyr, warn.conflicts = FALSE)
+  library(tidyr, warn.conflicts = FALSE)
+  library(glue, warn.conflicts = FALSE)
+  library(hmatch, warn.conflicts = FALSE)
   
   # paths to linelist files for given country
   path_data_raw_country <- file.path(path_data_raw, country)
@@ -174,8 +179,11 @@ read_and_prepare_data <- function(file_path,
                                   warn_recoded = FALSE) {
 
   ## requires
-  library(dplyr)
-  library(janitor)
+  library(dplyr, warn.conflicts = FALSE)
+  library(vctrs, warn.conflicts = FALSE)
+  library(readxl, warn.conflicts = FALSE)
+  library(hmatch, warn.conflicts = FALSE)
+  library(janitor, warn.conflicts = FALSE)
   source("R/utilities.R")
   
   ## only for running manually

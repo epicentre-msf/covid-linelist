@@ -41,7 +41,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
   
-  file_ll <- llu::list_files(
+  file_ll <- llutils::list_files(
     path_to_files,
     pattern = "Al Gam.*\\.xlsx",
     ignore.case = TRUE,
@@ -59,7 +59,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     # janitor::clean_names() %>% 
     mutate(site = "YEM_B_GAM") %>% 
     dplyr::left_join(dict_facilities_join, by = "site") %>% 
-    mutate(upload_date = as.character(llu::extract_date(file_ll)))
+    mutate(upload_date = as.character(llutils::extract_date(file_ll)))
 
   
   ### Check for unseen values in derivation variables

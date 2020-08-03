@@ -17,7 +17,7 @@ import_other_cod_oca <- function(path_linelist_other, dict_linelist) {
   library(dplyr)
   library(hmatch)
   
-  file_ll <- llu::list_files(
+  file_ll <- llutils::list_files(
     file.path(path_linelist_other, "OCA", "COD"),
     pattern = "LL_covid-19_OCA_COD_BRK_BDC.*\\.xlsx",
     ignore.case = TRUE,
@@ -35,7 +35,7 @@ import_other_cod_oca <- function(path_linelist_other, dict_linelist) {
     mutate(
       linelist_lang = "Français",
       linelist_vers = "Other",
-      upload_date = as.character(llu::extract_date(file_ll))) %>% 
+      upload_date = as.character(llutils::extract_date(file_ll))) %>% 
     rename(any_of(
       c("MSF_treament1" = "MSF_treatment1",
         "MSF_treament2" = "MSF_treatment2",

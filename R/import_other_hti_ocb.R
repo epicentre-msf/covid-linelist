@@ -48,12 +48,12 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
     select(var_epi, map_derive)
   
   files_ll <- c(
-    HTI_B_MAR = llu::list_files(
+    HTI_B_MAR = llutils::list_files(
       file.path(path_to_files, "Martissant"),
       pattern = "BD_LL_MT.*\\.xlsx",
       select = "latest"
     ),
-    HTI_B_PIM = llu::list_files(
+    HTI_B_PIM = llutils::list_files(
       file.path(path_to_files, "Port-a-Piment"),
       pattern = "LLa PaPim.*\\.xlsx",
       select = "latest"
@@ -71,7 +71,7 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   #   janitor::clean_names() %>% 
   #   mutate(site = "HTI_B_MAR") %>% 
   #   dplyr::left_join(dict_facilities_join, by = "site") %>% 
-  #   mutate(upload_date = as.character(llu::extract_date(file_ll)))
+  #   mutate(upload_date = as.character(llutils::extract_date(file_ll)))
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$symptomatique, c("oui", "non", NA))
@@ -154,7 +154,7 @@ import_hti_ocb_ <- function(path, site) {
     janitor::clean_names() %>% 
     janitor::remove_empty("rows") %>% 
     mutate(linelist_row = 1:n(),
-           upload_date = as.character(llu::extract_date(path)),
+           upload_date = as.character(llutils::extract_date(path)),
            site = site)
 }
 

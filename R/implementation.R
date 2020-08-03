@@ -11,7 +11,7 @@ source("R/zzz.R")
 
 
 ### Read latest global ll
-ll_file <- llu::list_files(
+ll_file <- llutils::list_files(
   path_export_global,
   pattern = "msf_covid19_.*\\.rds",
   full.names = TRUE,
@@ -75,7 +75,7 @@ cutoff_date <- floor_date(today(), "week")
 ## Write
 library(openxlsx)
 
-wb <- llct::write_simple_xlsx(out)
+wb <- llutils::write_simple_xlsx(out)
 
 red_bg <- createStyle(bgFill = "#FFC7CE")
 red_fg <- createStyle(fgFill = "#FFC7CE")

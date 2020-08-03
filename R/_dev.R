@@ -49,6 +49,7 @@ ll_import_epicentre <- purrr::map_dfr(
   dict_extra_vars = dict_extra_vars
 )
 
+
 ### Bind Epicentre and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
@@ -186,7 +187,7 @@ matchmaker::check_df(
 ### Write global export
 if (FALSE) {
   path_out_global <- file.path(path_export_global, glue("msf_covid19_linelist_global_{lubridate::today()}"))
-  llct::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
+  llutils::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
   saveRDS(d_global, paste0(path_out_global, ".rds"))
 }
 
@@ -231,12 +232,12 @@ if (FALSE) {
     # HIS-export
     d_oc_his <- filter(d_global_his, OC == OC_focal)
     path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
-    llct::write_simple_xlsx(d_oc_his, path_out1_oc)
+    llutils::write_simple_xlsx(d_oc_his, path_out1_oc)
     
     # focal point
     d_oc_foc <- filter(d_global, OC == OC_focal)
     path_out2_oc <- file.path(path_export_fp, OC_focal, file_out_oc)
-    llct::write_simple_xlsx(d_oc_foc, path_out2_oc)
+    llutils::write_simple_xlsx(d_oc_foc, path_out2_oc)
   }
 }
 

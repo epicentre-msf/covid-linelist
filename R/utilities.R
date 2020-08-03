@@ -45,7 +45,7 @@ write_ll_by_country <- function(country_focal,
   file_out_xlsx <- paste0(file_out, ".xlsx")
   
   saveRDS(out, file.path(path_export_country, country_focal, file_out_rds))
-  llu::write_simple_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
+  llutils::write_simple_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
 }
 
 

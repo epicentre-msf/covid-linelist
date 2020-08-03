@@ -10,7 +10,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   
   
   ### Read linelist
-  file_ll <- llu::list_files(
+  file_ll <- llutils::list_files(
     file.path(path_linelist_other, "OCP/AFG"),
     pattern = "\\.xlsx",
     full.names = TRUE,
