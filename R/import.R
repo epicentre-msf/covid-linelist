@@ -26,7 +26,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "VEN"
+    country <- "TCD"
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -53,7 +53,7 @@ import_linelists <- function(country,
     "MSF_N_Patient",
     "patient_id"
   )
-
+  
   ## import and prepare
   df_data <- df_sheets %>% 
     mutate(
@@ -66,7 +66,7 @@ import_linelists <- function(country,
         cols_derive = cols_derive
       )
     ) %>% 
-    select(-file_path) %>% 
+    select(-file_path) %>%
     tidyr::unnest("df") %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
@@ -145,6 +145,11 @@ scan_sheets <- function(path_data_raw,
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
     select(-site_name_join) %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path))
+  
+  if (any(is.na(df_sheet$site))) {
+    files_no_match <- unique(basename(df_sheet$file_path[is.na(df_sheet$site)]))
+    message("No site match within dict_facilities for file(s):\n- ", paste(files_no_match, collapse = "\n- "))
+  }
   
   if (return_latest) {
     df_sheet <- df_sheet %>% 
