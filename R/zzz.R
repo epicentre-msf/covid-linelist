@@ -7,9 +7,9 @@ library(readxl, warn.conflicts = FALSE)
 library(stringr, warn.conflicts = FALSE)
 library(janitor, warn.conflicts = FALSE)
 library(glue, warn.conflicts = FALSE)
-library(matchmaker, warn.conflicts = FALSE)    # remotes::install.github("patrickbarks/matchmaker")
-library(hmatch, warn.conflicts = FALSE)        # remotes::install.github("epicentre-msf/hmatch")
-library(llutils, warn.conflicts = FALSE)       # remotes::install.github("epicentre-msf/llutils")
+library(matchmaker, warn.conflicts = FALSE)    # remotes::install_github("patrickbarks/matchmaker")
+library(hmatch, warn.conflicts = FALSE)        # remotes::install_github("epicentre-msf/hmatch")
+library(llutils, warn.conflicts = FALSE)       # remotes::install_github("epicentre-msf/llutils")
 source("R/utilities.R")
 
 
@@ -18,14 +18,14 @@ source("R/utilities.R")
 path_onedrive <- switch(
   Sys.info()["user"],
   "patrickbarks" = path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi"),
-  "mathilde"     = path.expand(""),                        # Mathilde to edit
+  "M-MOUSSET"     = path.expand("D:/MSF/GRP-EPI-COVID-19 - NCoVEpi"),                        # Mathilde to edit
   path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi")          # generic Mac path 
-)
+  )
 
 path_afg_triage <- switch(
   Sys.info()["user"],
   "patrickbarks" = path.expand("~/MSF/GRP-EPI-PROJ-COVID-19-AFG - triage_HRH_IDP"),
-  "mathilde"     = path.expand(""),                                   # Mathilde to edit
+  "M-MOUSSET"     = path.expand(""),                                   # Mathilde to edit
   path.expand("~/MSF/GRP-EPI-PROJ-COVID-19-AFG - triage_HRH_IDP")     # generic Mac path 
 )
 
