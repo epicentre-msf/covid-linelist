@@ -53,7 +53,12 @@ import_other_bel_ocb <- function(path_linelist_other, dict_linelist) {
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 1) %>% 
+  d_orig <- readxl::read_xlsx(
+    file_ll,
+    col_types = "text",
+    skip = 1,
+    .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
+  ) %>% 
     janitor::remove_empty("rows") %>% 
     janitor::clean_names() %>% 
     mutate(site = "BEL_B_TOU") %>% 
