@@ -117,11 +117,11 @@ purrr::walk(
 
 ### Geocoding routines
 ll_geocode <- purrr::map_dfr(
-  countries_update[20:length(countries_update)],
+  countries_update,
   clean_geo,
   path_corrections_geocodes = path_corrections_geocodes,
   path_shapefiles = path_shapefiles,
-  write_checks = TRUE
+  write_checks = FALSE
 )
 
 
@@ -129,8 +129,9 @@ ll_geocode <- purrr::map_dfr(
 # ref <- fetch_georef("YEM")
 # 
 # ref %>%
-#   filter(level == 1) %>% 
-#   filter(grepl("al dhal", adm1, ignore.case = TRUE)) %>% 
+#   filter(adm1 == "Amanat Al Asimah أمانة العاصمة") %>% 
+#   filter(adm2 == "Ma'ain معين") 
+#   filter(grepl("Farcha", adm3, ignore.case = TRUE)) 
 #   print(n = 20)
 #   # filter(adm1 == "Miranda") %>%
 #   # filter(level == 1) %>%
@@ -142,7 +143,7 @@ ll_geocode <- purrr::map_dfr(
 queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count = TRUE)
-queryr::query(d_global, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
+queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
 
 
 purrr::walk(
@@ -158,7 +159,7 @@ purrr::walk(
 ### Compile global linelist
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
-  filter(!(OC == "OCA" & linelist_vers == "Go.Data")) %>% 
+  # filter(!(OC == "OCA" & linelist_vers == "Go.Data")) %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
   arrange(site) %>% 
