@@ -239,7 +239,7 @@ if (FALSE) {
     llutils::write_simple_xlsx(d_oc_foc, path_out2_oc)
     
     # patient_id losses
-    df_oc_compare <- compare_ids(OC, path_export = path_export)
+    df_oc_compare <- compare_ids(OC = OC_focal, path_export = path_export)
     path_out3_oc <- file.path(path_export, OC, glue::glue("patient_id_losses_{tolower(OC)}_{Sys.Date()}.xlsx"))
     llutils::write_simple_xlsx(df_oc_compare, file = path_out3_oc, group = compilation_date)
   }
