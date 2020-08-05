@@ -37,7 +37,6 @@ ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist)
 
 
-
 ### Import MSF Intersectional linelists
 ll_import_epicentre <- purrr::map_dfr(
   countries_update,
@@ -66,11 +65,11 @@ ll_import <- dplyr::bind_rows(
 
 # check for missing values among important columns
 queryr::query(ll_import, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_import, is.na(site), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_import, is.na(linelist_lang), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(site), cols_base = c(country, OC), count = TRUE) #!!!!
+queryr::query(ll_import, is.na(linelist_lang), cols_base = c(country, OC), count = TRUE) #!!
 queryr::query(ll_import, is.na(upload_date), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_import, is.na(country), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(country), cols_base = c(country, OC), count = TRUE) #!!!
+queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE) #!!!
 
 
 # save raw country-specific RDS files
@@ -102,7 +101,7 @@ ll_cleaned <- ll_import %>%
     dict_numeric_correct,
     dict_factors_correct,
     dict_countries_correct,
-    write_checks = FALSE
+    write_checks = TRUE
   )
 
 
@@ -118,7 +117,7 @@ purrr::walk(
 
 ### Geocoding routines
 ll_geocode <- purrr::map_dfr(
-  countries_update,
+  countries_update[20:length(countries_update)],
   clean_geo,
   path_corrections_geocodes = path_corrections_geocodes,
   path_shapefiles = path_shapefiles,

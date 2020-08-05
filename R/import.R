@@ -26,7 +26,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "TCD"
+    country <- "AFG"
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -106,6 +106,7 @@ scan_sheets <- function(path_data_raw,
   library(tidyr, warn.conflicts = FALSE)
   library(glue, warn.conflicts = FALSE)
   library(hmatch, warn.conflicts = FALSE)
+  source("R/utilities.R")
   
   # paths to linelist files for given country
   path_data_raw_country <- file.path(path_data_raw, country)
@@ -130,16 +131,16 @@ scan_sheets <- function(path_data_raw,
   ## prep dict_facilities for join
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
-    mutate(site_name_join = hmatch::string_std(site_filename)) %>% 
+    mutate(site_name_join = format_text2(site_filename)) %>% 
     select(site, country, shape, OC, project, site_name, uid,  site_name_join)
-  
+
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
     mutate(path_parse = gsub("lon_.+_(?=2020)", "0000__", path_parse, perl = TRUE)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{2}") %>% 
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
-    mutate(site_name_join = hmatch::string_std(site_name)) %>% 
+    mutate(site_name_join = format_text2(site_name)) %>% 
     select(-site_name, -project, -key) %>% 
     mutate_all(as.character) %>% 
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
@@ -281,11 +282,12 @@ recode_columns <- function(x, dict_extra_vars) {
   library(dplyr)
   library(hmatch)
   
+  
   # standardize extra names dict
   dict_extra_vars_prep <- dict_extra_vars %>% 
     mutate(match = hmatch::string_std(name_raw))  
   
-  out <- data.frame(orig = x) %>% 
+  out <- data.frame(orig = x, stringsAsFactors = FALSE) %>% 
     mutate(match = hmatch::string_std(orig)) %>% 
     left_join(dict_extra_vars_prep, by = "match") %>% 
     mutate(orig = ifelse(!is.na(name), name, orig))

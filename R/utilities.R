@@ -205,7 +205,7 @@ get_site_meta <- function(file_path) {
     # if no Options tab, find linelist language the hardcore way
     language_counts <- c(
       English = sum(ll == "Yes", na.rm = TRUE),
-      Français = sum(ll == "Oui", na.rm = TRUE),
+      `Français` = sum(ll == "Oui", na.rm = TRUE),
       Espagnol = sum(ll == "Si", na.rm = TRUE),
       Portuguese = sum(ll == "Sim", na.rm = TRUE)
     )
@@ -219,6 +219,18 @@ get_site_meta <- function(file_path) {
   }
   
   return(tibble::tibble(linelist_lang = language, linelist_vers = version))
+}
+
+
+
+format_text2 <- function(x){
+  library(stringr)
+  xx <- tolower(x)
+  xx <- stringr::str_trim(xx)
+  xx <- stringi::stri_trans_general(xx, id = "Latin-ASCII")
+  xx <- str_replace_all(xx, "[[:punct:]]|[[:space:]]", "")
+  xx[xx==""] <- NA_character_
+  return(xx)
 }
 
 

@@ -25,12 +25,13 @@ import_other_yem_pra <- function(path_linelist_other, dict_linelist) {
   )
   
   d_orig <- import_other_yem_pra_helper(file_ll) %>% 
-    mutate(site = case_when(
-      tolower(site_name) == "haydan hospital" ~ "YEM_P_HAY",
-      tolower(site_name) == "al salam hospital" ~ "YEM_P_ASA"
-    ))
+    
+    filter(!(site == "LBN_P_ELH" & as.Date(MSF_date_consultation) < as.Date("2020-06-01")))
   
-  test_set_equal(d_orig$site_name, c("haydan hospital", "al salam hospital"))
+  
+  test_set_equal(d_orig$site_name, c("haydan hospital", 
+                                     "al salam hospital", 
+                                     "elias hrawi hospital"))
   
   
   d_derived <- d_orig %>% 
@@ -84,7 +85,7 @@ import_other_yem_pra <- function(path_linelist_other, dict_linelist) {
 
 
 
-import_other_yem_pra_helper <- function(path, site) {
+import_other_yem_pra_helper <- function(path) {
   
   suppressMessages(readr::read_csv(path)) %>% 
     mutate_all(as.character) %>% 
@@ -97,8 +98,17 @@ import_other_yem_pra_helper <- function(path, site) {
            upload_date = upload_Date,
            MSF_test_results = MSF_test_first_results,
            MSF_visit_type = MSF_readmission) %>% 
-    mutate(linelist_row = 1:n(),
+    
+      mutate(site = case_when(
+      tolower(site_name) == "haydan hospital" ~ "YEM_P_HAY",
+      tolower(site_name) == "al salam hospital" ~ "YEM_P_ASA",
+      tolower(site_name) == "elias hrawi hospital" ~ "LBN_P_ELH"
+    ),
+    linelist_row = 1:n(),
            upload_date = stringr::str_extract(upload_date, "[0-9]{4}.?[0-9]{2}.?[0-9]{2}"),
-           shape = "YEM",
+           shape = dplyr::case_when(site == "YEM_P_HAY" ~ "YEM",
+                                    site == "YEM_P_ASA" ~ "YEM",
+                                    site == "LBN_P_ELH" ~ "LBN",
+                                    TRUE                ~  NA_character_),
            OC = "OCP")
 }

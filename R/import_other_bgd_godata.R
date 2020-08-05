@@ -39,17 +39,17 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
       path_to_files,
       pattern = "COVID19_Goyalmara.*\\.xlsx",
       select = "latest"
-    ),
-    BGD_A_KUT = llutils::list_files(
-      path_to_files_oca,
-      pattern = "BGD_CXB_KTP.*\\.xlsx",
-      select = "latest"
-    ),
-    BGD_A_BAL = llutils::list_files(
-      path_to_files_oca,
-      pattern = "BGD_CXB_BKL.*\\.xlsx",
-      select = "latest"
     )
+    # BGD_A_KUT = llutils::list_files(
+    #   path_to_files_oca,
+    #   pattern = "BGD_CXB_KTP.*\\.xlsx",
+    #   select = "latest"
+    # ),
+    # BGD_A_BAL = llutils::list_files(
+    #   path_to_files_oca,
+    #   pattern = "BGD_CXB_BKL.*\\.xlsx",
+    #   select = "latest"
+    # )
   )
   
   d_orig <- purrr::map2_dfr(

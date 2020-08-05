@@ -26,12 +26,14 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "BRA"
+    country <- "LBN"
     write_checks <- TRUE
   }
   
   ## read cleaned data
   dat <- readRDS(file.path("local", "clean", glue::glue("ll_covid_cleaned_{country}.rds")))
+  
+  
   
   ## shape
   shape <- unique(dat$shape)
