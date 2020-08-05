@@ -47,7 +47,7 @@ import_other_pak_ocb <- function(path_linelist_other, dict_linelist) {
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
   
-  map_comcond <- readxl::read_xlsx(file.path(path_to_files, "map_comcond_ocb_pak.xlsx")) %>% 
+  map_comcond <- readxl::read_xlsx(file.path(path_to_files, "Map_Comcond_OCB_Timurgara.xlsx")) %>% 
     select(-n)
   
   files_ll <- c(
