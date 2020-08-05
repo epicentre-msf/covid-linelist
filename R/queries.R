@@ -76,7 +76,8 @@ queries_written_site <- purrr::map_dfr(
 ) %>% 
   rename(!!query_recode_inv) %>% 
   select(-i) %>% 
-  mutate(across(c(linelist_row), as.integer))
+  mutate(across(c(linelist_row), as.integer)) %>% 
+  select(-exclude)
 
 # tracker_files <- llutils::list_files(
 #   path_queries, pattern = "query_tracker",
@@ -141,6 +142,8 @@ queries_full <- bind_rows(
 ) %>% 
   arrange(site, query_id, MSF_N_Patient)
 
+
+
 queries_out <- queries_full %>% 
   left_join(df_queries_join, by = c("site", "MSF_N_Patient", "linelist_row", "query_id", "variable1", "variable2")) %>% 
   left_join(sites_query_exclude, by = c("site", "query_id")) %>% 
@@ -155,7 +158,7 @@ queries_out <- queries_full %>%
     )
   ) %>% 
   mutate(date_resolved_auto = ifelse(is.na(date_resolved_auto) & resolved_join, as.character(Sys.Date()), date_resolved_auto)) %>% 
-  select(-resolved_join, -excluded_join, -exclude_categ) %>% 
+  select(-resolved_join, -excluded_join, -exclude_categ, -exclude) %>% 
   arrange(site, query_number)
 
 
