@@ -400,9 +400,14 @@
     "matchmaker": {
       "Package": "matchmaker",
       "Version": "0.1.1",
-      "Source": "Repository",
-      "Repository": null,
-      "Hash": "faae0c4f0c37c5e91cdfffd238212422"
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "matchmaker",
+      "RemoteUsername": "patrickbarks",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "22999959360523155fb86a6bb7495e7d492a8dbd",
+      "Hash": "f957fd2dcad134b6f46ea1d0794cf948"
     },
     "mgcv": {
       "Package": "mgcv",
@@ -562,6 +567,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "c66b930d20bb6d858cd18e1cebcfae5c"
+    },
+    "remotes": {
+      "Package": "remotes",
+      "Version": "2.2.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "430a0908aee75b1fcba0e62857cab0ce"
     },
     "renv": {
       "Package": "renv",
