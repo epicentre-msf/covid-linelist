@@ -324,6 +324,8 @@ queries_other <- function(dat_raw, dat_clean) {
     "patinfo_sex",
     "MSF_covid_status",
     # "Lab_date1",
+    # "MSF_test_results",
+    # "patcourse_dateonset",
     "MSF_visit_type",
     "MSF_date_consultation"
     # "outcome_patcourse_status",
@@ -335,10 +337,20 @@ queries_other <- function(dat_raw, dat_clean) {
   # OTHER_02 ECMO variable is "Yes" (to be checked by field)
   queries[["OTHER_02"]] <- query(dat_clean, patcourse_ecmo %in% "Yes" | outcome_patcourse_ecmo %in% "Yes")
   
+  # OTHER_03 Essential variable Date symptom onset is missing (only applies if Asymptomatic is not "Yes")
+  queries[["OTHER_03"]] <- query(dat_clean, patcourse_asymp != "Yes" & is.na(patcourse_dateonset))
+  
+  # OTHER_04 Essential variable Outcome patient status is missing (only applies if patient was admitted, and at least 14 days has elapsed between the visit date and latest upload date, or visit date is missing)
+  queries[["OTHER_04"]] <- query(dat_clean, patcourse_admit == "Yes" & is.na(outcome_patcourse_status) & (as.Date(upload_date) - MSF_date_consultation >= 14 | is.na(MSF_date_consultation)))
+  
+  # OTHER_05 Essential variable Date of outcome is missing (only applies if patient was admitted, and at least 14 days has elapsed between the visit date and latest upload date, or visit date is missing)
+  queries[["OTHER_05"]] <- query(dat_clean, patcourse_admit == "Yes" & is.na(outcome_date_of_outcome) & (as.Date(upload_date) - MSF_date_consultation >= 14 | is.na(MSF_date_consultation)))
+  
+  # OTHER_06 Essential variable Report date is missing (only applies to OCBA)
+  queries[["OTHER_06"]] <- query(dat_raw, OC == "OCBA" & is.na(report_date))
+  
   return(bind_query_list(queries))
 }
-
-
 
 
 query_match_dict <- function(dat_prep, dict_factors, lang) {
