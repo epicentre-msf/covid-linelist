@@ -373,8 +373,8 @@
       "RemoteRepo": "llutils",
       "RemoteUsername": "epicentre-msf",
       "RemoteRef": "HEAD",
-      "RemoteSha": "fe37d6980751196e621cf3e5c0f2275c4141337a",
-      "Hash": "3fb5d834b4f344a5102adaa62c6f56a0"
+      "RemoteSha": "e4102797c7bd8b0324085d1cc0c82d6c1ab9d3e7",
+      "Hash": "9b9b89f0757f0f1fdb0215c8bcdd8cd8"
     },
     "lubridate": {
       "Package": "lubridate",
@@ -568,31 +568,12 @@
       "Repository": "CRAN",
       "Hash": "c66b930d20bb6d858cd18e1cebcfae5c"
     },
-    "remotes": {
-      "Package": "remotes",
-      "Version": "2.2.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "430a0908aee75b1fcba0e62857cab0ce"
-    },
     "renv": {
       "Package": "renv",
       "Version": "0.11.0",
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "1c3ef87cbb81c23ac96797781ec7aecc"
-    },
-    "repi": {
-      "Package": "repi",
-      "Version": "0.1.0",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "repi",
-      "RemoteUsername": "epicentre-msf",
-      "RemoteRef": "master",
-      "RemoteSha": "b14a88c58134a0ef391de8319eb9813d66ad0502",
-      "Hash": "b036da7056f5dc4e79bea8b99f97b179"
     },
     "reprex": {
       "Package": "reprex",
@@ -790,10 +771,10 @@
     },
     "zip": {
       "Package": "zip",
-      "Version": "2.0.4",
+      "Version": "2.1.0",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "caa73cdca1a87e5f2617915c8809f207"
+      "Hash": "e900bc5f049697942cc2d4d2e7e8f857"
     }
   }
 }

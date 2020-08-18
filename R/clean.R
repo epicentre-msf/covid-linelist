@@ -168,7 +168,7 @@ clean_linelist <- function(dat,
            date = as.Date(date))
   
   dat_date <- dat_date %>% 
-    repi::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE) %>% 
+    llutils::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE) %>% 
     mutate(flag_ambiguous = ifelse(!date_is_recoded & !is.na(value) & is.na(date), "flag_ambiguous", NA)) %>% 
     select(-date_is_recoded)
   
