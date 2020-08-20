@@ -122,7 +122,8 @@ import_other_yem_ocp <- function(path_linelist_other, dict_linelist) {
       outcome_patcourse_status == "death in the hospital" ~ "Died",
       outcome_patcourse_status == "DAMA" ~ "Left against medical advice",
       outcome_patcourse_status == "discharged home" ~ "Cured",
-      outcome_patcourse_status == "death on arrival" ~ "Died"
+      outcome_patcourse_status == "death on arrival" ~ "Died",
+      TRUE ~ outcome_patcourse_status
     )) %>% 
     mutate(
       MSF_date_consultation = as.character(parse_dates(MSF_date_consultation)),

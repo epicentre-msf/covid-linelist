@@ -244,7 +244,7 @@ queries_multi <- function(dat_raw, dat_clean) {
   )
   
   # MULTI_17 Case contact other setting is specified but Case contact setting is not specified 
-  queries[["MULTI_17"]] <- query(dat_clean, !is.na(MSF_expo_other_setting) & is.na(expo_case_setting_detail))
+  queries[["MULTI_17"]] <- query(dat_raw, !is.na(MSF_expo_other_setting) & is.na(expo_case_setting_detail))
   
   # MULTI_18 Outcome date of symptom onset is specified but Outcome asymptomatic is not 'No'
   
@@ -274,7 +274,7 @@ queries_multi <- function(dat_raw, dat_clean) {
   queries[["MULTI_25"]] <- query(dat_clean, !is.na(outcome_patcourse_status_other) & is.na(outcome_patcourse_status))
   
   # MULTI_26 Outcome date of release or death is given but Outcome patient status is missing
-  queries[["MULTI_26"]] <- query(dat_clean, !is.na(outcome_date_of_outcome) & is.na(outcome_patcourse_status))
+  queries[["MULTI_26"]] <- query(dat_raw, !is.na(outcome_date_of_outcome) & is.na(outcome_patcourse_status))
   
   # MULTI_27 Facility refer to is specified but Outcome patient status is not 'Transferred'
   queries[["MULTI_27"]] <- query(dat_clean, !is.na(MSF_refer_to) & !outcome_patcourse_status %in% "Transferred")
@@ -338,7 +338,7 @@ queries_other <- function(dat_raw, dat_clean) {
   queries[["OTHER_02"]] <- query(dat_clean, patcourse_ecmo %in% "Yes" | outcome_patcourse_ecmo %in% "Yes")
   
   # OTHER_03 Essential variable Date symptom onset is missing (only applies if Asymptomatic is not "Yes")
-  queries[["OTHER_03"]] <- query(dat_clean, patcourse_asymp != "Yes" & is.na(patcourse_dateonset))
+  queries[["OTHER_03"]] <- query(dat_clean, !patcourse_asymp %in% c("Yes", "Unknown") & is.na(patcourse_dateonset))
   
   # OTHER_04 Essential variable Outcome patient status is missing (only applies if patient was admitted, and at least 14 days has elapsed between the visit date and latest upload date, or visit date is missing)
   queries[["OTHER_04"]] <- query(dat_clean, patcourse_admit == "Yes" & is.na(outcome_patcourse_status) & (as.Date(upload_date) - MSF_date_consultation >= 14 | is.na(MSF_date_consultation)))

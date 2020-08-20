@@ -35,6 +35,16 @@ dat_clean <- llutils::list_files(
   mutate(upload_date = as.character(upload_date))
 
 
+  
+# dat_raw %>%
+#   filter(OC == "OCBA") %>%
+#   group_by(site) %>%
+#   summarize(n_missing_report_date = sum(is.na(report_date)),
+#             n_total = n(),
+#             .groups = "drop") %>%
+#   filter(n_missing_report_date > 0) %>%
+#   arrange(desc(n_missing_report_date))
+
 
 ### Run all queries
 df_queries <- dplyr::bind_rows(
@@ -51,7 +61,6 @@ df_queries_join <- df_queries %>%
   select(c("site", "MSF_N_Patient", "query_id", "linelist_row", "variable1", "variable2")) %>%
   unique() %>%
   mutate(resolved_join = FALSE)
-
 
 
 ### Queries old
@@ -77,7 +86,7 @@ queries_written_site <- purrr::map_dfr(
   rename(!!query_recode_inv) %>% 
   select(-i) %>% 
   mutate(across(c(linelist_row), as.integer)) %>% 
-  select(-exclude)
+  select(-any_of(c("exclude")))
 
 # tracker_files <- llutils::list_files(
 #   path_queries, pattern = "query_tracker",
