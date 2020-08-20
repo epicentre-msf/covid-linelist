@@ -1,17 +1,15 @@
 #' Import, standardize, and combine linelists from each facility
 #'
-#' @param country Country ISO code
-#' @param path_data_raw Path to directory containing linelists
-#' @param dict_facilities Dictionary mapping site-ID columns (country, OC,
-#'   project) to site codes
+#' @param path_linelist_other 
 #' @param dict_linelist Master linelist variable dictionary
+#' @param exclude optional data frame containing combinations of site and MSF_N_Patient to exclude
 #'
 #' @return
 #' Combined linelist <tibble> created by binding together the most recent
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
+import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude = NULL) {
   
   ## requires
   library(dplyr)
@@ -28,6 +26,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
   ## initial import
   path_to_files <- file.path(path_linelist_other, "OCBA", "BGD")
   path_to_files_oca <- file.path(path_linelist_other, "OCA", "BGD")
+  path_to_files_ocp <- file.path(path_linelist_other, "OCP", "BGD")
   
   files_ll <- c(
     BGD_E_UMS = llutils::list_files(
@@ -39,17 +38,22 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
       path_to_files,
       pattern = "COVID19_Goyalmara.*\\.xlsx",
       select = "latest"
+    ),
+    BGD_A_KUT = llutils::list_files(
+      path_to_files_oca,
+      pattern = "BGD_CXB_KTP.*\\.xlsx",
+      select = "latest"
+    ),
+    BGD_A_BAL = llutils::list_files(
+      path_to_files_oca,
+      pattern = "BGD_CXB_BKL.*\\.xlsx",
+      select = "latest"
+    ),
+    BGD_P_IPD = llutils::list_files(
+      path_to_files_ocp,
+      pattern = "BGD_OCP.*\\.xlsx",
+      select = "latest"
     )
-    # BGD_A_KUT = llutils::list_files(
-    #   path_to_files_oca,
-    #   pattern = "BGD_CXB_KTP.*\\.xlsx",
-    #   select = "latest"
-    # ),
-    # BGD_A_BAL = llutils::list_files(
-    #   path_to_files_oca,
-    #   pattern = "BGD_CXB_BKL.*\\.xlsx",
-    #   select = "latest"
-    # )
   )
   
   d_orig <- purrr::map2_dfr(
@@ -247,25 +251,34 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist) {
   df_data <- df_data %>% 
     mutate(across(any_of(date_vars), ~ as.character(as.Date(.x))))
   
+  # exclude
+  if (!is.null(exclude)) {
+    df_data <- dplyr::anti_join(df_data, exclude, by = c("site", "MSF_N_Patient"))
+  }
+  
   ## return
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
 }
- 
-
 
 
 
 import_go_data_ <- function(path, site) {
   
-  readxl::read_xlsx(
+  d <- readxl::read_xlsx(
     path, 
     col_types = "text",
     na = c("", "NA"),
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
-  ) %>% 
-    janitor::remove_empty("rows") %>% 
-    # following line is a quick hack to remove WHO CRF entries for OCA, which mostly (possibly completely) overlap with data in intersectional LL
-    filter(!is.na(`_Select your agency`)) %>% 
+  ) %>%
+    janitor::remove_empty("rows")
+  
+  # remove WHO CRF entries for OCA, which overlap with data in intersectional LL
+  if (site %in% c("BGD_A_KUT", "BGD_A_BAL")) {
+    d <- d %>% 
+      filter(!is.na(`_Health Facility`))
+  }
+    
+  d %>% 
     mutate(linelist_row = 1:n(),
            upload_date = as.character(llutils::extract_date(path)),
            linelist_lang = "English",

@@ -29,7 +29,7 @@ clean_linelist <- function(dat,
   library(dplyr, warn.conflicts = FALSE)
   library(tidyr, warn.conflicts = FALSE)
   library(glue, warn.conflicts = FALSE)
-  library(repi, warn.conflicts = FALSE)
+  library(llutils, warn.conflicts = FALSE)
   library(matchmaker, warn.conflicts = FALSE)
   source("R/clean.R")
   source("R/utilities.R")
@@ -37,6 +37,7 @@ clean_linelist <- function(dat,
   ## if running manually
   if (FALSE) {
     dat <- ll_import
+    # dat <- ll_cleaned
     write_checks <- TRUE
   }
   
@@ -79,7 +80,8 @@ clean_linelist <- function(dat,
   dict_numeric_prep <- dict_numeric_correct %>% 
     mutate_at(vars(patient_id, variable, value), as.character) %>% 
     mutate_at(vars(replacement), as.integer) %>% 
-    mutate(replace = TRUE)
+    mutate(replace = TRUE) %>% 
+    select(-new)
     
   
   ## gather numeric variables, convert to numeric, and apply dictionary
@@ -136,7 +138,6 @@ clean_linelist <- function(dat,
     select(-value, -replace, -flag) %>%
     tidyr::spread(variable, value_numeric) %>% 
     left_join_replace(x = dat, y = ., cols_match = c("db_row", "patient_id"))
-  
   
   #### Clean date variables ----------------------------------------------------
   

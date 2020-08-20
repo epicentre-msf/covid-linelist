@@ -25,7 +25,6 @@ import_other_yem_pra <- function(path_linelist_other, dict_linelist) {
   )
   
   d_orig <- import_other_yem_pra_helper(file_ll) %>% 
-    
     filter(!(site == "LBN_P_ELH" & as.Date(MSF_date_consultation) < as.Date("2020-06-01")))
   
   

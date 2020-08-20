@@ -16,7 +16,8 @@ import_linelists <- function(country,
                              path_data_raw,
                              dict_facilities,
                              dict_linelist,
-                             dict_extra_vars) {
+                             dict_extra_vars,
+                             site_exclude = NULL) {
   
   ## requires
   library(dplyr, warn.conflicts = FALSE)
@@ -31,7 +32,8 @@ import_linelists <- function(country,
   
   ## scan and parse linelist files to identify the most recent linelist file to
   # import for each facility
-  df_sheets <- scan_sheets(path_data_raw, country, dict_facilities)
+  df_sheets <- scan_sheets(path_data_raw, country, dict_facilities) %>% 
+    filter(!site %in% site_exclude)
   
   if (nrow(df_sheets) == 0) return(NULL)
   

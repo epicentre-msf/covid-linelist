@@ -14,6 +14,25 @@ source("R/compare.R")
 # focal country ISO code
 countries_update <- sort(c(countries, "BEL", "PAK")) # update to include countries in linelist-other
 
+
+### Import MSF Intersectional linelists
+ll_import_epicentre <- purrr::map_dfr(
+  countries_update,
+  import_linelists,
+  path_data_raw = path_data_raw,
+  dict_facilities = dict_facilities,
+  dict_linelist = dict_linelist,
+  dict_extra_vars = dict_extra_vars,
+  site_exclude = "BGD_P_IPD" # switched to godata
+)
+
+
+### MSF_N_Patient from OCA/BGD intersectional linelists, before they switched to GoData
+# used to filter out a few duplicates entries between intersectional ll and GoData
+id_oca_bgd_intersect <- ll_import_epicentre %>% 
+  filter(site == "BGD_A_KUT") %>% 
+  select(site, MSF_N_Patient)
+
 ### Import non-intersectional linelists
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
@@ -25,7 +44,6 @@ source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
 source("R/import_other_bgd_godata.R")
 
-
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
@@ -34,18 +52,7 @@ ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
-ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist)
-
-
-### Import MSF Intersectional linelists
-ll_import_epicentre <- purrr::map_dfr(
-  countries_update,
-  import_linelists,
-  path_data_raw = path_data_raw,
-  dict_facilities = dict_facilities,
-  dict_linelist = dict_linelist,
-  dict_extra_vars = dict_extra_vars
-)
+ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
 
 
 ### Bind Intersectional and Other imports
@@ -121,23 +128,20 @@ ll_geocode <- purrr::map_dfr(
   clean_geo,
   path_corrections_geocodes = path_corrections_geocodes,
   path_shapefiles = path_shapefiles,
-  write_checks = FALSE
+  write_checks = TRUE
 )
 
 
 
 # ref <- fetch_georef("YEM")
 # 
+# 
 # ref %>%
 #   filter(adm1 == "Amanat Al Asimah أمانة العاصمة") %>% 
 #   filter(adm2 == "Ma'ain معين") 
 #   filter(grepl("Farcha", adm3, ignore.case = TRUE)) 
-#   print(n = 20)
-#   # filter(adm1 == "Miranda") %>%
-#   # filter(level == 1) %>%
-#   filter(grepl("sho", pcode, ignore.case = TRUE))
 
-  
+
 
 # check again for missing values among important columns
 queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
@@ -159,7 +163,6 @@ purrr::walk(
 ### Compile global linelist
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
-  # filter(!(OC == "OCA" & linelist_vers == "Go.Data")) %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
   arrange(site) %>% 
@@ -188,7 +191,6 @@ if (FALSE) {
   llutils::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
   saveRDS(d_global, paste0(path_out_global, ".rds"))
 }
-
 
 
 

@@ -144,10 +144,10 @@
     },
     "cpp11": {
       "Package": "cpp11",
-      "Version": "0.1.0",
+      "Version": "0.2.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "07ac25dbe65bfa02deac8ec3bf74fdd2"
+      "Hash": "c4c83167f43ca762a9fa998d4fead3ae"
     },
     "crayon": {
       "Package": "crayon",
@@ -186,10 +186,10 @@
     },
     "dplyr": {
       "Package": "dplyr",
-      "Version": "1.0.1",
+      "Version": "1.0.2",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "018b2fc43cb25d9f07241986c53fbf8e"
+      "Hash": "d0509913b27ea898189ee664b6030dc2"
     },
     "ellipsis": {
       "Package": "ellipsis",
@@ -291,8 +291,8 @@
       "RemoteRepo": "hmatch",
       "RemoteUsername": "epicentre-msf",
       "RemoteRef": "HEAD",
-      "RemoteSha": "ffcf4ca81056aa88a964ddc39df6836f0fff3e9a",
-      "Hash": "21c31bdbe69b62534be8c0f1d270c5f4"
+      "RemoteSha": "a82bf040797e9b9ad8db469875aa537055d0ef6d",
+      "Hash": "8a40d97c9f7db3e3e48675281c02b137"
     },
     "hms": {
       "Package": "hms",
