@@ -23,7 +23,8 @@ sites_query_exclude <- readxl::read_xlsx(file.path(path_queries, "exclude_query_
 
 ### Compile global linelist of raw imports
 dat_raw <- list.files("local/raw", pattern = "^ll_covid_raw", full.names = TRUE) %>%
-  purrr::map_dfr(readRDS)
+  purrr::map_dfr(readRDS) %>% 
+  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC))
 
 dat_clean <- llutils::list_files(
   path_export_global,
@@ -35,7 +36,6 @@ dat_clean <- llutils::list_files(
   mutate(upload_date = as.character(upload_date))
 
 
-  
 # dat_raw %>%
 #   filter(OC == "OCBA") %>%
 #   group_by(site) %>%
@@ -61,6 +61,8 @@ df_queries_join <- df_queries %>%
   select(c("site", "MSF_N_Patient", "query_id", "linelist_row", "variable1", "variable2")) %>%
   unique() %>%
   mutate(resolved_join = FALSE)
+
+
 
 
 ### Queries old
@@ -152,7 +154,6 @@ queries_full <- bind_rows(
   arrange(site, query_id, MSF_N_Patient)
 
 
-
 queries_out <- queries_full %>% 
   left_join(df_queries_join, by = c("site", "MSF_N_Patient", "linelist_row", "query_id", "variable1", "variable2")) %>% 
   left_join(sites_query_exclude, by = c("site", "query_id")) %>% 
@@ -169,6 +170,7 @@ queries_out <- queries_full %>%
   mutate(date_resolved_auto = ifelse(is.na(date_resolved_auto) & resolved_join, as.character(Sys.Date()), date_resolved_auto)) %>% 
   select(-resolved_join, -excluded_join, -exclude_categ, -exclude) %>% 
   arrange(site, query_number)
+
 
 
 

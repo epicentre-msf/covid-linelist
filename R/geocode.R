@@ -26,14 +26,12 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "LBN"
+    country <- "VEN"
     write_checks <- TRUE
   }
   
   ## read cleaned data
   dat <- readRDS(file.path("local", "clean", glue::glue("ll_covid_cleaned_{country}.rds")))
-  
-  
   
   ## shape
   shape <- unique(dat$shape)
@@ -67,7 +65,7 @@ clean_geo <- function(country,
     ## manual corrections
     file_recode <- llutils::list_files(
       path_corrections_geocodes,
-      pattern = paste0("geocodes_recode", shape),
+      pattern = paste0("geocodes_recode_", shape),
       full.names = TRUE,
       select = "latest"
     )

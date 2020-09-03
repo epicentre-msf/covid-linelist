@@ -39,6 +39,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   test_set_equal(d_orig$other_immunodeficiency, c("yes", "no","unknown",  NA))
   test_set_equal(d_orig$malignancy_cancer, c("yes", "no", "unknown", NA))
   
+  
   ### Constants and derived variables
   d_derived <- d_orig %>% 
     # site metadata
@@ -88,7 +89,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     )) %>% 
     # derive MSF_refer_to
     mutate(
-      MSF_refer_to = ifelse(referral == "Other:", if_other_58, referral),
+      MSF_refer_to = ifelse(referral == "Other:", if_other_59, referral),
       MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
     )
   
@@ -101,8 +102,8 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   #   count(previous_test_result, lab_result, clinical_category, sent_for_testing, MSF_covid_status)
   
   # # examine variable combos relevant to derivation of MSF_refer_to
-  # d_derived %>% 
-  #   count(referral, if_other_58, MSF_refer_to)
+  # d_derived %>%
+  #   count(referral, if_other_59, MSF_refer_to)
   
   
   ### Recode columns with straightforward mapping to Epicentre variables
@@ -165,7 +166,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       expo_travel_country1 = if_yes_destination,
       MSF_severity = category_according_to_clinical_examination,
       # referral,
-      # if_other_58,
+      # if_other_59,
       # patient_refusing_referral,
       # temperature_celsius,
       # sp_o2_percent,

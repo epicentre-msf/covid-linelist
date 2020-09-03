@@ -83,7 +83,8 @@ import_other_pak_ocb <- function(path_linelist_other, dict_linelist) {
   )
   test_set_equal(
     d_orig$outcome,
-    c("deceased", "discharged for home isolation", "defaulted", "tested negative", "referred for advanced care", "discharged cured", NA, "quarantine discontinued (contact neg result)", "isolation discontinued (neg result)") 
+    c("deceased", "discharged for home isolation", "discharged for home quarentine", "defaulted", "tested negative",
+      "referred for advanced care", "discharged cured", NA, "quarantine discontinued (contact neg result)", "isolation discontinued (neg result)") 
   )
   
   
@@ -136,6 +137,7 @@ import_other_pak_ocb <- function(path_linelist_other, dict_linelist) {
         tolower(outcome) == "defaulted" ~ "Left against medical advice",
         tolower(outcome) == "discharged cured" ~ "Cured",
         tolower(outcome) == "discharged for home isolation" ~ "Sent back home",
+        tolower(outcome) == "discharged for home quarentine" ~ "Sent back home",
         tolower(outcome) == "isolation discontinued (neg result)" ~ "Cured",
         tolower(outcome) == "quarantine discontinued (contact neg result)" ~ "Cured",
         tolower(outcome) == "referred for advanced care" ~ "Transferred",

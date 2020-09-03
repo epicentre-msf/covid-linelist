@@ -28,11 +28,13 @@ geobase <- list.files(path_geobase, pattern = "xlsx") %>%
 
 
 ### Linelist language and version
-sheets <- purrr::map_dfr(countries,
-                         scan_sheets,
-                         path_data_raw = path_data_raw,
-                         dict_facilities = dict_facilities,
-                         return_latest = FALSE) %>% 
+sheets <- purrr::map_dfr(
+  countries,
+  scan_sheets,
+  path_data_raw = path_data_raw,
+  dict_facilities = dict_facilities,
+  return_latest = FALSE
+) %>% 
   mutate(meta = map(file_path, get_site_meta)) %>% 
   unnest("meta") %>% 
   mutate(upload_date = as.Date(upload_date)) %>% 
@@ -49,23 +51,29 @@ sheets <- purrr::map_dfr(countries,
 ### Proportion admin matchable
 dat_summary <- dat %>% 
   group_by(site) %>% 
-  summarize(visits = n(),
-            prop_admin1 = sum(!is.na(adm1_name__res)) / visits,
-            prop_admin2 = sum(!is.na(adm2_name__res)) / visits,
-            prop_admin3 = sum(!is.na(adm3_name__res)) / visits,
-            .groups = "drop") %>% 
+  summarize(
+    visits = n(),
+    prop_admin1 = sum(!is.na(adm1_name__res)) / visits,
+    prop_admin2 = sum(!is.na(adm2_name__res)) / visits,
+    prop_admin3 = sum(!is.na(adm3_name__res)) / visits,
+    .groups = "drop"
+  ) %>% 
   mutate(across(starts_with("prop_admin"), ~ round(.x, digits = 2)))
 
 
 ### Assemble output
 out <- dict_facilities %>% 
   mutate(geobase_available = ifelse(shape %in% geobase, "Yes", "No")) %>% 
-  select(site, country = country_full, OC, project, site_type, site_name, geobase_available) %>% 
+  select(site, country = country_full, OC, project, site_type, site_name, geobase_available, comment) %>% 
   left_join(sheets, by = "site") %>% 
   left_join(dat_summary, by = "site") %>% 
   arrange(site) %>% 
   mutate(across(where(is.Date), as.character)) %>% 
-  select(country, OC, project, site_name, site_code = site, site_type, version, language, first_upload, latest_upload, everything())
+  select(
+    country, OC, project, site_name, site_code = site, site_type, version,
+    language, first_upload, latest_upload, geobase_available, visits,
+    starts_with("prop"), comment
+  )
 
 
 ### Date of most recent Sunday (flag if latest upload before)
@@ -82,6 +90,7 @@ red_fg <- createStyle(fgFill = "#FFC7CE")
 
 i_no_recent_export <- which(out$latest_upload < cutoff_date) + 1L
 addStyle(wb, 1, cols = 10, rows = i_no_recent_export, style = red_fg, stack = TRUE)
+addFilter(wb, 1, rows = 1, cols = seq_len(ncol(out)))
 
 conditionalFormatting(wb, 1, cols = 11, rows = 1:nrow(out), type = "contains", rule = "No", style = red_bg)
 

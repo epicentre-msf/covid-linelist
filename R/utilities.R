@@ -45,7 +45,8 @@ write_ll_by_country <- function(country_focal,
   file_out_xlsx <- paste0(file_out, ".xlsx")
   
   saveRDS(out, file.path(path_export_country, country_focal, file_out_rds))
-  llutils::write_simple_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
+  # llutils::write_simple_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
+  writexl::write_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
 }
 
 
@@ -578,19 +579,24 @@ write_query_tracker_site <- function(queries_out, OC_focal) {
     queries_out <- filter(queries_out, OC %in% OC_focal)
   }
   
-  paths_oc_site <- distinct(queries_out, OC, site) %>% 
+  
+  paths_oc_site <- queries_out %>% 
+    mutate(OC = ifelse(OC == "OCB/OCP", "OCB_OCP", OC)) %>% 
+    distinct(OC, site) %>% 
     arrange(OC, site) %>% 
     mutate(path_site = file.path(path_export_fp, OC, "queries", site),
            path_file = file.path(path_site, glue("query_tracker_{site}_{today()}.xlsx")))
   
   for (i in seq_len(nrow(paths_oc_site))) {
     if (!dir.exists(paths_oc_site$path_site[i])) {
-      dir.create(paths_oc_site$path_site[i])
+      dir.create(paths_oc_site$path_site[i], recursive = TRUE)
     }
     
-    write_query_tracker(queries_out,
-                        site_focal = paths_oc_site$site[i],
-                        path = paths_oc_site$path_file[i])
+    write_query_tracker(
+      queries_out,
+      site_focal = paths_oc_site$site[i],
+      path = paths_oc_site$path_file[i]
+    )
   }
 }
 

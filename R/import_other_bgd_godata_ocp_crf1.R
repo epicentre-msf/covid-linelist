@@ -9,14 +9,13 @@
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude = NULL) {
+import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist, exclude = NULL) {
   
   ## requires
   library(dplyr)
   library(hmatch)
   library(rlang)
-  source("R/import_other_bgd_godata.R")
-  
+  source("R/import_other_bgd_godata_ocp_crf1.R")
   
   ## site metadata
   dict_facilities_join <- dict_facilities %>% 
@@ -25,35 +24,9 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   
   ## initial import
   path_to_files <- file.path(path_linelist_other, "OCBA", "BGD")
-  path_to_files_oca <- file.path(path_linelist_other, "OCA", "BGD")
   path_to_files_ocp <- file.path(path_linelist_other, "OCP", "BGD")
   
   files_ll <- c(
-    BGD_E_UMS = llutils::list_files(
-      path_to_files,
-      pattern = "UMS.*\\.xlsx",
-      select = "latest"
-    ),
-    BGD_E_GOY = llutils::list_files(
-      path_to_files,
-      pattern = "Goyalmara.*\\.xlsx",
-      select = "latest"
-    ),
-    BGD_E_NAY = llutils::list_files(
-      path_to_files,
-      pattern = "Nayapara.*\\.xlsx",
-      select = "latest"
-    ),
-    BGD_A_KUT = llutils::list_files(
-      path_to_files_oca,
-      pattern = "BGD_CXB_KTP.*\\.xlsx",
-      select = "latest"
-    ),
-    BGD_A_BAL = llutils::list_files(
-      path_to_files_oca,
-      pattern = "BGD_CXB_BKL.*\\.xlsx",
-      select = "latest"
-    ),
     BGD_P_IPD = llutils::list_files(
       path_to_files_ocp,
       pattern = "BGD_OCP.*\\.xlsx",
@@ -66,7 +39,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
     names(files_ll),
     import_go_data_
   ) %>% 
-    filter(!(site == "BGD_P_IPD" & is.na(`_Select your agency`))) # remove old CRF rows
+    filter(is.na(`_Select your agency`)) # limit to CRF1
   
   d_name_map <- tibble(
     orig = names(d_orig),
@@ -76,7 +49,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   ## mapping file
   map_occupations <- readxl::read_xlsx(file.path(path_to_files, "map_occupations.xlsx"))
   
-  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_go_data.xlsx") %>% 
+  df_map <- file.path(path_to_files_ocp, "LL_v2.1_mapping_template_go_data_crf1.xlsx") %>% 
     readxl::read_xlsx() %>% 
     select(1, 7, 8, 9, 10) %>% 
     setNames(c("var_epi", "map_type", "map_direct", "map_constant", "map_derive"))
@@ -139,17 +112,17 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
       age_age_years == "0" ~ "Month"
     )) %>% 
     # derive MSF_admin_location_past_week
-    mutate(across(addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, ~ ifelse(is.na(.x), "", .x))) %>%
-    unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, sep = " | ") %>% 
+    mutate(across(addresses_location_1_location_geographical_level_3, ~ ifelse(is.na(.x), "", .x))) %>%
+    unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3) %>% 
     # MSF_job
     hmatch(map_occupations) %>% 
-    # MSF_symptom_aches
-    mutate(MSF_symptom_aches = case_when(
-      muscle_ache %in% "Yes" | joint_ache %in% "Yes" ~ "Yes",
-      muscle_ache %in% "No" | joint_ache %in% "No" ~ "No",
-      is.na(muscle_ache) & is.na(joint_ache) ~ NA_character_,
-      TRUE ~ "Unknown"
-    )) %>% 
+    # # MSF_symptom_aches
+    # mutate(MSF_symptom_aches = case_when(
+    #   muscle_ache %in% "Yes" | joint_ache %in% "Yes" ~ "Yes",
+    #   muscle_ache %in% "No" | joint_ache %in% "No" ~ "No",
+    #   is.na(muscle_ache) & is.na(joint_ache) ~ NA_character_,
+    #   TRUE ~ "Unknown"
+    # )) %>% 
     # Comcond_immuno
     mutate(Comcond_immuno = case_when(
       hiv_immunodeficiency %in% "Yes" | other_immunosup_disorder %in% "Yes" ~ "Yes",

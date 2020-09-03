@@ -29,8 +29,8 @@ ll_import_epicentre <- purrr::map_dfr(
 
 ### MSF_N_Patient from OCA/BGD intersectional linelists, before they switched to GoData
 # used to filter out a few duplicates entries between intersectional ll and GoData
-id_oca_bgd_intersect <- ll_import_epicentre %>% 
-  filter(site == "BGD_A_KUT") %>% 
+id_oca_bgd_intersect <- ll_import_epicentre %>%
+  filter(site == "BGD_A_KUT") %>%
   select(site, MSF_N_Patient)
 
 ### Import non-intersectional linelists
@@ -39,20 +39,22 @@ source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
 source("R/import_other_pak_ocb.R")
-source("R/import_other_yem_ocb.R")
+source("R/import_other_yem_ocb_old.R") # still using MoH version for now
 source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
 source("R/import_other_bgd_godata.R")
+source("R/import_other_bgd_godata_ocp_crf1.R")
 
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
-ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist)
+ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # still using MoH version for now
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
+ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
 
 
 ### Bind Intersectional and Other imports
@@ -66,7 +68,8 @@ ll_import <- dplyr::bind_rows(
   ll_other_yem_ocb,
   ll_other_yem_ocp,
   ll_other_yem_pra,
-  ll_other_bgd_godata
+  ll_other_bgd_godata,
+  ll_other_bgd_godata_ocp1
 )
 
 
@@ -112,7 +115,6 @@ ll_cleaned <- ll_import %>%
   )
 
 
-
 purrr::walk(
   sort(unique(ll_cleaned$country)),
   write_by_country,
@@ -133,9 +135,6 @@ ll_geocode <- purrr::map_dfr(
 
 
 
-# ref <- fetch_georef("YEM")
-# 
-# 
 # ref %>%
 #   filter(adm1 == "Amanat Al Asimah أمانة العاصمة") %>% 
 #   filter(adm2 == "Ma'ain معين") 
@@ -161,15 +160,25 @@ purrr::walk(
 
 
 ### Compile global linelist
+# d_previous_yem_b_gam <- llutils::list_files(
+#   path_export_global,
+#   "msf_covid19_linelist_global_.*.rds",
+#   select = "latest"
+# ) %>% 
+#   readRDS() %>% 
+#   filter(site == "YEM_B_GAM") %>% 
+#   select(-triage_site)
+
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
-  arrange(site) %>% 
   rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
+  # bind_rows(d_previous_yem_b_gam) %>% 
+  arrange(site) %>% 
   mutate(db_row = 1:n()) %>% 
-  mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type")
-
+  mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type") %>% 
+  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC))
 
 
 # double-check for allowed values
@@ -180,8 +189,6 @@ matchmaker::check_df(
   col_vars = "variable",
   always_allow_na = TRUE
 )
-
-
 
 
 
@@ -224,19 +231,24 @@ d_global_his <- d_global %>%
 
 
 OC_list <- unique(d_global_his$OC)
+OC_list <- OC_list[!grepl("/", OC_list)]
 
 
 if (FALSE) {
   for (OC_focal in OC_list) {
     file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
     
+    # account for sites run by 2+ OCs
+    OC_focal_sub <- OC_focal
+    if (OC_focal_sub %in% c("OCB", "OCP")) OC_focal_sub <- c(OC_focal_sub, "OCB/OCP")
+    
     # HIS-export
-    d_oc_his <- filter(d_global_his, OC == OC_focal)
+    d_oc_his <- filter(d_global_his, OC %in% OC_focal_sub)
     path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
     llutils::write_simple_xlsx(d_oc_his, path_out1_oc)
     
     # focal point
-    d_oc_foc <- filter(d_global, OC == OC_focal)
+    d_oc_foc <- filter(d_global, OC %in% OC_focal_sub)
     path_out2_oc <- file.path(path_export_fp, OC_focal, file_out_oc)
     llutils::write_simple_xlsx(d_oc_foc, path_out2_oc)
     

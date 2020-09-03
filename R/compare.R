@@ -37,9 +37,9 @@ compare_ids <- function(OC, path_export) {
   ## compare
   for (i in ii) {
     out[[i]] <- compare_ids_(
-      compilations[[i]],
-      compilations[[i+1]],
-      compilations[[i_latest]],
+      d = compilations[[i]],
+      d_next= compilations[[i+1]],
+      d_latest = compilations[[i_latest]],
       date = compilation_dates[i],
       date_next = compilation_dates[i+1],
       date_latest = compilation_dates[i_latest]
@@ -66,7 +66,8 @@ compare_ids_ <- function(d,
       next__compilation_date = date_next,
       next_at_row__upload_date = upload_date,
       next_at_row__MSF_N_Patient = MSF_N_Patient,
-      next_at_row__patient_id = patient_id
+      next_at_row__patient_id = patient_id,
+      ll_version
     )
   
   d_latest_new <- d_latest %>% 
@@ -77,7 +78,8 @@ compare_ids_ <- function(d,
       latest__compilation_date = date_latest,
       latest_at_row__upload_date = upload_date,
       latest_at_row__MSF_N_Patient = MSF_N_Patient,
-      latest_at_row__patient_id = patient_id
+      latest_at_row__patient_id = patient_id,
+      ll_version
     )
   
   d %>% 
