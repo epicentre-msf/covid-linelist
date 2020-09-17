@@ -1,5 +1,27 @@
 
 
+drop_unnamed_columns <- function(x) {
+  x[nchar(names(x)) > 0]
+}
+
+
+derive_event_date <- function(dat) {
+  
+  dates_event <- dat %>% 
+    select(MSF_date_consultation, report_date, Lab_date1)
+  
+  date_value <- apply(dates_event, 1, first_not_na_value)
+  date_type <- apply(dates_event, 1, first_not_na, no_na = NA_integer_)
+  date_type <- names(dates_event)[date_type]
+  
+  dat %>% 
+    mutate(date_event = lubridate::as_date(date_value),
+           date_event_source = date_type,
+           .before = "report_date")
+}
+
+
+
 #' Turn vector into dput-like output, for use in warnings and errors
 #' @noRd
 vec_paste_c <- function(x) {
@@ -336,6 +358,16 @@ max_not_na <- function(x, no_na = 0L, value = FALSE) {
 }
 
 
+first_not_na <- function(x, no_na = NA) {
+  ifelse(any(!is.na(x)), min(which(!is.na(x))), no_na)
+}
+
+
+first_not_na_value <- function(x, no_na = NA) {
+  ifelse(any(!is.na(x)), x[!is.na(x)][1L], no_na)
+}
+
+
 dist_match <- function(x, y, max_dist = 1) {
   abs(as.numeric(x - y)) <= max_dist | is.na(x) | is.na(y)
 }
@@ -449,24 +481,36 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   }
   
   queries_resolved <- queries_out %>% 
-    filter(resolved_auto %in% c("Yes", "Resolved", "Removed")) %>% 
+    filter(resolved_auto %in% c("Yes", "Resolved", "Removed") | resolved_field %in% c("Resolved")) %>% 
     mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
   
   queries_outstanding <- queries_out %>% 
-    filter(resolved_auto %in% c("No", "Unresolved")) %>% 
+    filter(resolved_auto %in% c("No", "Unresolved") & !resolved_field %in% c("Resolved")) %>% 
     mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
   
+  unique(queries_out$resolved_auto)
+  
   queries_summary <- queries_out %>% 
-    group_by(category, query_id, resolved_auto, description) %>% 
+    mutate(status = case_when(
+      resolved_auto == "Resolved" ~ "Resolved_Auto",
+      resolved_auto == "Removed" ~ "Removed",
+      resolved_field == "Resolved" ~ "Resolved_Field",
+      TRUE ~ "Unresolved"
+    )) %>% 
+    group_by(category, query_id, status, description) %>% 
     summarize(n_total = n(), .groups = "drop") %>% 
-    tidyr::pivot_wider(names_from = "resolved_auto", values_from = "n_total", values_fill = 0)
+    tidyr::pivot_wider(names_from = "status", values_from = "n_total", values_fill = 0)
   
   if (!"Removed" %in% names(queries_summary)) {
     queries_summary$Removed <- rep(0L, nrow(queries_summary))
   }
   
-  if (!"Resolved" %in% names(queries_summary)) {
-    queries_summary$Resolved <- rep(0L, nrow(queries_summary))
+  if (!"Resolved_Field" %in% names(queries_summary)) {
+    queries_summary$Resolved_Field <- rep(0L, nrow(queries_summary))
+  }
+  
+  if (!"Resolved_Auto" %in% names(queries_summary)) {
+    queries_summary$Resolved_Auto <- rep(0L, nrow(queries_summary))
   }
   
   if (!"Unresolved" %in% names(queries_summary)) {
@@ -474,13 +518,14 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   }
   
   queries_summary <- queries_summary %>% 
-    mutate(total = Removed + Resolved + Unresolved) %>% 
+    mutate(total = Removed + Resolved_Field + Resolved_Auto + Unresolved) %>% 
     arrange(desc(total)) %>% 
     select(Category = category,
            `Query ID` = query_id,
            `N Total` = total,
            `N Removed` = Removed,
-           `N Resolved` = Resolved,
+           `N Resolved (field)` = Resolved_Field,
+           `N Resolved (auto)` = Resolved_Auto,
            `N Outstanding` = Unresolved,
            Description = description)
   
@@ -501,6 +546,8 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
     "Value 1" = "value1",
     "Variable 2" = "variable2",
     "Value 2" = "value2",
+    "Variable 3" = "variable3",
+    "Value 3" = "value3",
     "Date query generated" = "date_generated",
     "Resolved (auto)" = "resolved_auto",
     "Date resolved (auto)" = "date_resolved_auto",
@@ -509,13 +556,11 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
     "Comment (field)" = "comment"
   )
   
-  
   queries_outstanding <- queries_outstanding %>% 
     rename(!!!header_recode)
   
   queries_resolved <- queries_resolved %>% 
     rename(!!!header_recode)
-  
   
   ## Write updated query tracker sheets to file
   library(openxlsx)
@@ -524,11 +569,19 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   hs <- openxlsx::createStyle(halign = "center", textDecoration = "Bold")
   la <- openxlsx::createStyle(halign = "left")
   
+  # column widths
+  col_w <- c(
+    6, 15, 14,        # i - Query #
+    10, 12, 13, 15,   # OC - Upload date
+    20, 15, 20, 15,   # # Patient - Query ID
+    120, 40, 30, 40, 30, 40, 30, # Description - Value 3
+    22, 17, 22, 17, 22, 70
+  )
+  
   # sheet 1 (Main query tracker)
   openxlsx::addWorksheet(wb, "Current", zoom = 130)
   openxlsx::writeData(wb, 1, queries_outstanding, withFilter = TRUE)
-  openxlsx::setColWidths(wb, 1, cols = 1:ncol(queries_outstanding),
-                         widths = c(6, 15, 14, 10, 12, 13, 15, 20, 15, 20, 15, 100, 40, 30, 40, 30, 22, 17, 22, 17, 22, 70))
+  openxlsx::setColWidths(wb, 1, cols = 1:ncol(queries_outstanding), widths = col_w)
   openxlsx::freezePane(wb, 1, firstActiveRow = 2)
   openxlsx::addStyle(wb, 1, style = hs, rows = 1, cols = 1:ncol(queries_outstanding), gridExpand = TRUE)
   openxlsx::addStyle(wb, 1, style = la, rows = 2:(nrow(queries_outstanding) + 1L), cols = 1:ncol(queries_outstanding), gridExpand = TRUE)
@@ -541,8 +594,7 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   # sheet 2 (Resolved queries)
   openxlsx::addWorksheet(wb, "Resolved", zoom = 130)
   openxlsx::writeData(wb, 2, queries_resolved, withFilter = TRUE)
-  openxlsx::setColWidths(wb, 2, cols = 1:ncol(queries_resolved),
-                         widths = c(6, 15, 14, 10, 12, 13, 15, 20, 15, 20, 15, 100, 40, 30, 40, 30, 22, 17, 22, 17, 22, 70))
+  openxlsx::setColWidths(wb, 2, cols = 1:ncol(queries_resolved), widths = col_w)
   openxlsx::freezePane(wb, 2, firstActiveRow = 2)
   openxlsx::addStyle(wb, 2, style = hs, rows = 1, cols = 1:ncol(queries_resolved), gridExpand = TRUE)
   openxlsx::addStyle(wb, 2, style = la, rows = 2:(nrow(queries_resolved) + 1L), cols = 1:ncol(queries_resolved), gridExpand = TRUE)
@@ -559,7 +611,7 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   openxlsx::addStyle(wb, 3, style = hs, rows = 1, cols = 1:ncol(queries_summary), gridExpand = TRUE)
   openxlsx::addStyle(wb, 3, style = la, rows = 2:(nrow(queries_summary) + 1L), cols = 1:ncol(queries_summary), gridExpand = TRUE)
   openxlsx::setColWidths(wb, 3, cols = 1:ncol(queries_summary),
-                         widths = c(21, 14, 12, 12, 12, 12, 110))
+                         widths = c(21, 15, 15, 15, 15, 15, 15, 110))
   
   suppressMessages(
     openxlsx::saveWorkbook(
@@ -578,7 +630,6 @@ write_query_tracker_site <- function(queries_out, OC_focal) {
   if (!missing(OC_focal)) {
     queries_out <- filter(queries_out, OC %in% OC_focal)
   }
-  
   
   paths_oc_site <- queries_out %>% 
     mutate(OC = ifelse(OC == "OCB/OCP", "OCB_OCP", OC)) %>% 

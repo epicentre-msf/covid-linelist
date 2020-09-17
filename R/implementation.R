@@ -41,16 +41,34 @@ sheets <- purrr::map_dfr(
   group_by(site) %>% 
   summarize(
     first_upload = min(upload_date),
-    latest_upload = max(upload_date),
-    language = unique(linelist_lang),
-    version = max(linelist_vers),
+    # latest_upload = max(upload_date),
+    # language = unique(linelist_lang),
+    # version = max(linelist_vers),
     .groups = "drop"
   )
+
+dat_raw <- list.files("local/raw", pattern = "^ll_covid_raw", full.names = TRUE) %>%
+  purrr::map_dfr(readRDS) %>% 
+  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC))
+
+dat_raw_summary <- dat_raw %>% 
+  mutate(upload_date = parse_dates(upload_date)) %>% 
+  group_by(site) %>% 
+  summarize(
+    latest_upload = max(upload_date),
+    language = unique(linelist_lang),
+    version = paste(unique(linelist_vers, collapse = "; ")),
+    # visits = n(),
+    .groups = "drop"
+  )
+
+sheets_merge <- sheets %>% 
+  right_join(dat_raw_summary, by = "site")
 
 
 ### Proportion admin matchable
 dat_summary <- dat %>% 
-  group_by(site) %>% 
+  group_by(site, version = ll_version) %>% 
   summarize(
     visits = n(),
     prop_admin1 = sum(!is.na(adm1_name__res)) / visits,
@@ -58,6 +76,7 @@ dat_summary <- dat %>%
     prop_admin3 = sum(!is.na(adm3_name__res)) / visits,
     .groups = "drop"
   ) %>% 
+  # select(visits) %>% 
   mutate(across(starts_with("prop_admin"), ~ round(.x, digits = 2)))
 
 
@@ -65,8 +84,8 @@ dat_summary <- dat %>%
 out <- dict_facilities %>% 
   mutate(geobase_available = ifelse(shape %in% geobase, "Yes", "No")) %>% 
   select(site, country = country_full, OC, project, site_type, site_name, geobase_available, comment) %>% 
-  left_join(sheets, by = "site") %>% 
-  left_join(dat_summary, by = "site") %>% 
+  inner_join(sheets_merge, by = "site") %>% 
+  left_join(dat_summary, by = c("site", "version")) %>% 
   arrange(site) %>% 
   mutate(across(where(is.Date), as.character)) %>% 
   select(

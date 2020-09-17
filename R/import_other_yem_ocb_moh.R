@@ -19,7 +19,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   
   path_to_files <- file.path(path_linelist_other, "OCB", "YEM")
   
-  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_YEM.xlsx") %>% 
+  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_Yemen_v1.xlsx") %>% 
     readxl::read_xlsx() %>% 
     janitor::clean_names() %>% 
     select(1, 6, 7, 8, 9, 10) %>% 
@@ -43,7 +43,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   
   file_ll <- llutils::list_files(
     path_to_files,
-    pattern = "Al Gam.*\\.xlsx",
+    pattern = "YE155_Line List_MoH.*\\.xlsx",
     ignore.case = TRUE,
     full.names = TRUE,
     select = "latest"
@@ -53,20 +53,20 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 1, .name_repair = hmatch::string_std) %>% 
+  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 0, .name_repair = hmatch::string_std) %>% 
     rename("Comcond_other" = "") %>%  # original variables has no English name
     janitor::remove_empty("rows") %>% 
     # janitor::clean_names() %>% 
     mutate(site = "YEM_B_GAM") %>% 
     dplyr::left_join(dict_facilities_join, by = "site") %>% 
     mutate(upload_date = as.character(llutils::extract_date(file_ll)))
-
+  
   
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$the_test_result_negative_positive_not_done_pending, c("negative", "positive", "pending", NA))
-  test_set_equal(d_orig$diagnostic_mechanism, c("ct.scan", "ct,scan", "chest.x-ray", "x-ray", NA))
+  test_set_equal(d_orig$diagnostic_mechanism, c("ct scan", "ct.scan", "ct,scan", "chest.x-ray", "x-ray", NA))
   test_set_equal(d_orig$cardiovascular_disease_yes_no, c("yes", "no", NA))
-  test_set_equal(d_orig$if_she_is_pregnant_in_which_month_no, c(NA)) # reassess derivation if values populated
+  test_set_equal(d_orig$if_yes_e_is_pregnant_in_which_month_no, c(NA, "6", "]")) # reassess derivation if values populated
   
   ### Derivation for patcourse_asymp
   any_symptoms <- d_orig %>% 
@@ -80,7 +80,6 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     ) %>% 
     mutate_all(tolower) %>% 
     apply(., 1, function(x) any(grepl("^y", x)))
-  
   
   ### Derived variables
   d_derive <- d_orig %>% 
@@ -104,8 +103,8 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate(test_result = the_test_result_negative_positive_not_done_pending) %>% 
     mutate(across(c(test_result, diagnostic_mechanism), tolower)) %>% 
     mutate(MSF_covid_status = case_when(
-      test_result %in% "positive" | diagnostic_mechanism %in% c("ct.scan", "ct,scan", "chest.x-ray") ~ "Confirmed",
-      test_result == "negative" & !diagnostic_mechanism %in% c("ct.scan", "ct,scan", "chest.x-ray") ~ "Not a case",
+      test_result %in% "positive" | diagnostic_mechanism %in% c("ct scan", "ct.scan", "ct,scan", "chest.x-ray") ~ "Confirmed",
+      test_result == "negative" & !diagnostic_mechanism %in% c("ct scan", "ct.scan", "ct,scan", "chest.x-ray") ~ "Not a case",
       TRUE ~ "Probable"
     )) %>% 
     # derive patcourse_asymp
@@ -117,12 +116,15 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
       )
     ) %>% 
     # derive Comcond_pregt
-    mutate(Comcond_pregt = case_when(
-      as.numeric(if_she_is_pregnant_in_which_month_no) %in% 0:3 ~ "1",
-      as.numeric(if_she_is_pregnant_in_which_month_no) %in% 4:6 ~ "2",
-      as.numeric(if_she_is_pregnant_in_which_month_no) %in% 7:9 ~ "3",
-      TRUE ~ NA_character_
-    )) %>% 
+    mutate(
+      if_yes_e_is_pregnant_in_which_month_no = as_numeric_quiet(if_yes_e_is_pregnant_in_which_month_no),
+      Comcond_pregt = case_when(
+        as.numeric(if_yes_e_is_pregnant_in_which_month_no) %in% 0:3 ~ "1",
+        as.numeric(if_yes_e_is_pregnant_in_which_month_no) %in% 4:6 ~ "2",
+        as.numeric(if_yes_e_is_pregnant_in_which_month_no) %in% 7:9 ~ "3",
+        TRUE ~ NA_character_
+      )
+    ) %>% 
     # derive Comcond_cardi
     mutate(across(c(cardiovascular_disease_yes_no, blood_pressure_yes_no), tolower)) %>% 
     mutate(
@@ -141,7 +143,6 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
         TRUE ~ outcome_status
       )
     )
-    
   
   ### Constants and 1:1 mappings
   d_out <- d_derive %>% 
@@ -170,7 +171,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
                    "uid",
                    "MSF_N_Patient",
                    "patient_id")
-
+  
   ## import and prepare
   df_data <- d_out %>% 
     group_by(site) %>% 
@@ -193,5 +194,4 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   ## return
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
 }
- 
 

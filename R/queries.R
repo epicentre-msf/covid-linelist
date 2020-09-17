@@ -1,4 +1,5 @@
 
+
 ### Required libraries
 library(tidyverse)
 library(lubridate)
@@ -36,16 +37,6 @@ dat_clean <- llutils::list_files(
   mutate(upload_date = as.character(upload_date))
 
 
-# dat_raw %>%
-#   filter(OC == "OCBA") %>%
-#   group_by(site) %>%
-#   summarize(n_missing_report_date = sum(is.na(report_date)),
-#             n_total = n(),
-#             .groups = "drop") %>%
-#   filter(n_missing_report_date > 0) %>%
-#   arrange(desc(n_missing_report_date))
-
-
 ### Run all queries
 df_queries <- dplyr::bind_rows(
   queries_ident(dat_raw, dat_clean),
@@ -54,7 +45,8 @@ df_queries <- dplyr::bind_rows(
   queries_multi(dat_raw, dat_clean),
   queries_other(dat_raw, dat_clean)
 ) %>% 
-  anti_join(sites_query_exclude, by = c("query_id", "site"))
+  anti_join(sites_query_exclude, by = c("query_id", "site")) %>% 
+  select(-any_of(paste0("variable", 4:9)), -any_of(paste0("value", 4:9)))
 
 
 df_queries_join <- df_queries %>%
@@ -63,10 +55,8 @@ df_queries_join <- df_queries %>%
   mutate(resolved_join = FALSE)
 
 
-
-
 ### Queries old
-OC_list <- c("OCG", "OCBA", "OCB", "OCP", "OCA")
+OC_list <- c("OCG", "OCBA", "OCB", "OCP", "OCA", "OCB_OCP")
 
 query_dirs <- purrr::map(
   OC_list,
@@ -81,6 +71,7 @@ query_tracker_files <- purrr::map(
   select = "latest"
 ) %>% unlist()
 
+
 queries_written_site <- purrr::map_dfr(
   query_tracker_files,
   read_query_trackers
@@ -88,7 +79,11 @@ queries_written_site <- purrr::map_dfr(
   rename(!!query_recode_inv) %>% 
   select(-i) %>% 
   mutate(across(c(linelist_row), as.integer)) %>% 
-  select(-any_of(c("exclude")))
+  select(-any_of(c("exclude")), -any_of(paste0("variable", 4:9)), -any_of(paste0("value", 4:9))) %>% 
+  relocate(c(variable3, value3), .after = "value2") %>% 
+  mutate(resolved_field = dplyr::if_else(!is.na(date_resolved_field), "Resolved", resolved_field)) %>% 
+  mutate(date_resolved_field = as.character(parse_dates(date_resolved_field)))
+
 
 # tracker_files <- llutils::list_files(
 #   path_queries, pattern = "query_tracker",
@@ -153,7 +148,6 @@ queries_full <- bind_rows(
 ) %>% 
   arrange(site, query_id, MSF_N_Patient)
 
-
 queries_out <- queries_full %>% 
   left_join(df_queries_join, by = c("site", "MSF_N_Patient", "linelist_row", "query_id", "variable1", "variable2")) %>% 
   left_join(sites_query_exclude, by = c("site", "query_id")) %>% 
@@ -172,12 +166,12 @@ queries_out <- queries_full %>%
   arrange(site, query_number)
 
 
-
-
 # write global query tracker
 if (FALSE) {
   write_query_tracker(queries_out, path = file.path(path_queries, glue::glue("query_tracker_{today()}.xlsx")))
 }
+
+
 
 # write site-specific query trackers
 if (FALSE) {

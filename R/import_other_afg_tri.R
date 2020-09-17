@@ -11,7 +11,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   
   ### Read linelist
   file_ll <- llutils::list_files(
-    file.path(path_linelist_other, "OCP", "AFG"),
+    path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "\\.xlsx",
     full.names = TRUE,
     select = "latest"
@@ -27,6 +27,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     site_name = c("Herat Regional Hospital MSF COVID-19 Triage", "MSF IDP Clinic")
   )
   
+  
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$msf_facitity, c("hrh", "idp"))
   test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", NA))
@@ -38,7 +39,6 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   test_set_equal(d_orig$sent_for_testing, c("yes", "no", NA))
   test_set_equal(d_orig$other_immunodeficiency, c("yes", "no","unknown",  NA))
   test_set_equal(d_orig$malignancy_cancer, c("yes", "no", "unknown", NA))
-  
   
   ### Constants and derived variables
   d_derived <- d_orig %>% 
@@ -89,7 +89,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     )) %>% 
     # derive MSF_refer_to
     mutate(
-      MSF_refer_to = ifelse(referral == "Other:", if_other_59, referral),
+      MSF_refer_to = ifelse(referral == "Other:", if_other_61, referral),
       MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
     )
   
@@ -236,11 +236,12 @@ import_afg_tri_helper <- function(path, site) {
   
   readxl::read_xlsx(
     path, 
-    sheet = "data",
+    sheet = " data",
     skip = 1, col_types = "text",
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>% 
     janitor::clean_names() %>% 
+    filter(!almost_empty_rows(., n_crit = 3)) %>% 
     mutate(linelist_row = 1:n(),
            upload_date = as.character(upload_date),
            linelist_lang = "English",

@@ -66,8 +66,7 @@ compare_ids_ <- function(d,
       next__compilation_date = date_next,
       next_at_row__upload_date = upload_date,
       next_at_row__MSF_N_Patient = MSF_N_Patient,
-      next_at_row__patient_id = patient_id,
-      ll_version
+      next_at_row__patient_id = patient_id
     )
   
   d_latest_new <- d_latest %>% 
@@ -78,8 +77,7 @@ compare_ids_ <- function(d,
       latest__compilation_date = date_latest,
       latest_at_row__upload_date = upload_date,
       latest_at_row__MSF_N_Patient = MSF_N_Patient,
-      latest_at_row__patient_id = patient_id,
-      ll_version
+      latest_at_row__patient_id = patient_id
     )
   
   d %>% 

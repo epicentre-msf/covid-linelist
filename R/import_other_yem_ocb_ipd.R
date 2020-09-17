@@ -19,7 +19,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   
   path_to_files <- file.path(path_linelist_other, "OCB", "YEM")
   
-  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_YEM.xlsx") %>% 
+  df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_Yemen_v3.xlsx") %>% 
     readxl::read_xlsx() %>% 
     janitor::clean_names() %>% 
     select(1, 6, 7, 8, 9, 10) %>% 
@@ -28,7 +28,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   df_map_direct <- df_map %>% 
     filter(map_type == "1:1 correspondence") %>% 
     select(var_epi, map_direct) %>% 
-    mutate(map_direct_std = map_direct)
+    mutate(map_direct_std = hmatch::string_std(map_direct))
   
   vec_map_direct <- setNames(df_map_direct$map_direct_std, df_map_direct$var_epi)
   
@@ -43,7 +43,7 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
   
   file_ll <- llutils::list_files(
     path_to_files,
-    pattern = "YE155_Line List_MoH.*\\.xlsx",
+    pattern = "YE155_Register_IPD.*\\.xlsx",
     ignore.case = TRUE,
     full.names = TRUE,
     select = "latest"
@@ -53,33 +53,38 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 0, .name_repair = hmatch::string_std) %>% 
-    rename("Comcond_other" = "") %>%  # original variables has no English name
+  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 1, .name_repair = hmatch::string_std) %>% 
+    drop_unnamed_columns() %>% 
     janitor::remove_empty("rows") %>% 
-    # janitor::clean_names() %>% 
     mutate(site = "YEM_B_GAM") %>% 
     dplyr::left_join(dict_facilities_join, by = "site") %>% 
     mutate(upload_date = as.character(llutils::extract_date(file_ll)))
+
   
+  # ### Check for unseen values in derivation variables
+  # test_set_equal(d_orig$the_test_result_negative_positive_not_done_pending, c("negative", "positive", "pending", NA))
+  # test_set_equal(d_orig$diagnostic_mechanism, c("ct scan", "ct.scan", "ct,scan", "chest.x-ray", "x-ray", NA))
+  # test_set_equal(d_orig$cardiovascular_disease_yes_no, c("yes", "no", NA))
+  # test_set_equal(d_orig$if_yes_e_is_pregnant_in_which_month_no, c(NA, "6", "]")) # reassess derivation if values populated
   
-  ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$the_test_result_negative_positive_not_done_pending, c("negative", "positive", "pending", NA))
-  test_set_equal(d_orig$diagnostic_mechanism, c("ct scan", "ct.scan", "ct,scan", "chest.x-ray", "x-ray", NA))
-  test_set_equal(d_orig$cardiovascular_disease_yes_no, c("yes", "no", NA))
-  test_set_equal(d_orig$if_yes_e_is_pregnant_in_which_month_no, c(NA, "6", "]")) # reassess derivation if values populated
+# Confirmed = 
+# “COVID 19 PCR status” = positive 
+# “COVID 19 PCR status” = blank or not done AND “CT scan typical for COVID” = Yes
+# Not a case 
+# “COVID 19 PCR status” = negative
+# “COVID 19 PCR status” = blank or not done AND “CT scan typical for COVID” = No
+# Probable = “Primary diagnosis at discharge” = “confirmed/probable COVID 19” AND
+#            “COVID 19 PCR Status” is blank or not done AND
+#            “CT Scan atypical for COVID” is blank or not done
+# Suspect = all the rest
   
-  ### Derivation for patcourse_asymp
-  any_symptoms <- d_orig %>% 
-    select(
-      high_temperature_yes_no,
-      sore_throat_yes_no,
-      difficulty_breathing_yes_no,
-      muscle_and_joint_pain_yes_no,
-      descent_from_the_nose_yes_no,
-      cough_yes_no
-    ) %>% 
-    mutate_all(tolower) %>% 
-    apply(., 1, function(x) any(grepl("^y", x)))
+  d_orig %>% 
+    select(covid_status = covid_19_pcr_status_positive_negative_not_done,
+           diagnosis_discharge = primary_diagnosis_at_discharge_confirmed_probable_covid_19_not_a_case_of_covid_19_other_medical_condition_please_specify,
+           ct_scan = ct_scan_typical_for_covid_yes_no_not_done) %>% 
+    mutate_all(toupper) %>% 
+    count(covid_status, ct_scan, diagnosis_discharge) %>% 
+    print(n = "all")
   
   ### Derived variables
   d_derive <- d_orig %>% 

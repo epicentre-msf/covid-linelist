@@ -382,7 +382,12 @@ clean_linelist <- function(dat,
       patcourse_presHCF = case_when(
         patcourse_admit == "Yes" & is.na(patcourse_presHCF) ~ MSF_date_consultation,
         TRUE ~ patcourse_presHCF
-      )
+      ),
+      # test
+      outcome_patcourse_admit = case_when(
+        !is.na(outcome_patcourse_admit) ~ outcome_patcourse_admit,
+        patcourse_admit == "Yes" ~ "Yes"
+      ),
     )
   
   ### return

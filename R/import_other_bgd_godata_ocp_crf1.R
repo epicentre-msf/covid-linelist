@@ -209,9 +209,9 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   
   ## import and prepare
   df_data <- d_out %>% 
-    group_by(site) %>% 
-    mutate(linelist_row = 1:n()) %>% 
-    ungroup() %>% 
+    # group_by(site) %>% 
+    # mutate(linelist_row = 1:n()) %>% 
+    # ungroup() %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n()) %>% 
     mutate(linelist_lang = "English",

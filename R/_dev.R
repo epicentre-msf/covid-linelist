@@ -39,7 +39,7 @@ source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
 source("R/import_other_pak_ocb.R")
-source("R/import_other_yem_ocb_old.R") # still using MoH version for now
+source("R/import_other_yem_ocb_moh.R") # still using MoH version for now
 source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
 source("R/import_other_bgd_godata.R")
@@ -115,6 +115,7 @@ ll_cleaned <- ll_import %>%
   )
 
 
+
 purrr::walk(
   sort(unique(ll_cleaned$country)),
   write_by_country,
@@ -135,11 +136,13 @@ ll_geocode <- purrr::map_dfr(
 
 
 
+
 # ref %>%
 #   filter(adm1 == "Amanat Al Asimah أمانة العاصمة") %>% 
 #   filter(adm2 == "Ma'ain معين") 
 #   filter(grepl("Farcha", adm3, ignore.case = TRUE)) 
 
+# View(fetch_georef("YEM"))
 
 
 # check again for missing values among important columns
@@ -171,6 +174,7 @@ purrr::walk(
 
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
+  derive_event_date() %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
   rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
@@ -178,7 +182,9 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
   arrange(site) %>% 
   mutate(db_row = 1:n()) %>% 
   mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type") %>% 
-  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC))
+  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) %>% 
+  filter(!(site == "CAF_A_BBY" & is.na(report_date) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
+
 
 
 # double-check for allowed values
@@ -246,7 +252,7 @@ if (FALSE) {
     d_oc_his <- filter(d_global_his, OC %in% OC_focal_sub)
     path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
     llutils::write_simple_xlsx(d_oc_his, path_out1_oc)
-    
+
     # focal point
     d_oc_foc <- filter(d_global, OC %in% OC_focal_sub)
     path_out2_oc <- file.path(path_export_fp, OC_focal, file_out_oc)
