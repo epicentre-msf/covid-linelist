@@ -113,9 +113,9 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     )) %>% 
     # derive MSF_admin_location_past_week
     mutate(across(addresses_location_1_location_geographical_level_3, ~ ifelse(is.na(.x), "", .x))) %>%
-    unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3) %>% 
+    unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3) %>%
     # MSF_job
-    hmatch(map_occupations) %>% 
+    # hmatch(map_occupations) %>% ## 'occupation' column missing as of 2020-10-07
     # # MSF_symptom_aches
     # mutate(MSF_symptom_aches = case_when(
     #   muscle_ache %in% "Yes" | joint_ache %in% "Yes" ~ "Yes",
