@@ -27,6 +27,7 @@ ll_import_epicentre <- purrr::map_dfr(
 )
 
 
+
 ### MSF_N_Patient from OCA/BGD intersectional linelists, before they switched to GoData
 # used to filter out a few duplicates entries between intersectional ll and GoData
 id_oca_bgd_intersect <- ll_import_epicentre %>%
@@ -38,6 +39,8 @@ source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
+source("R/import_other_ind_ocb.R")
+source("R/import_other_irq_ocb.R")
 source("R/import_other_pak_ocb.R")
 source("R/import_other_yem_ocb_moh.R") # still using MoH version for now
 source("R/import_other_yem_ocp.R")
@@ -49,6 +52,8 @@ ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
+ll_other_ind_ocb <- import_other_ind_ocb(path_linelist_other, dict_linelist)
+ll_other_irq_ocb <- import_other_irq_ocb(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # still using MoH version for now
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
@@ -64,6 +69,8 @@ ll_import <- dplyr::bind_rows(
   ll_other_bel_ocb,
   ll_other_cod_oca,
   ll_other_hti_ocb,
+  ll_other_ind_ocb,
+  ll_other_irq_ocb,
   ll_other_pak_ocb,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
@@ -88,7 +95,6 @@ purrr::walk(
   write_by_country,
   dat = ll_import
 )
-
 
 
 ### Implement cleaning routines
@@ -135,13 +141,10 @@ ll_geocode <- purrr::map_dfr(
 )
 
 
-
-
-# ref %>%
-#   filter(adm1 == "Amanat Al Asimah أمانة العاصمة") %>% 
-#   filter(adm2 == "Ma'ain معين") 
-#   filter(grepl("Farcha", adm3, ignore.case = TRUE)) 
-
+# fetch_georef("VEN") %>%
+#   filter(adm1 == "Miranda") %>%
+#   filter(grepl("altos", pcode, ignore.case = TRUE))
+# 
 # View(fetch_georef("YEM"))
 
 
@@ -160,8 +163,6 @@ purrr::walk(
 )
 
 
-
-
 ### Compile global linelist
 # d_previous_yem_b_gam <- llutils::list_files(
 #   path_export_global,
@@ -171,6 +172,13 @@ purrr::walk(
 #   readRDS() %>% 
 #   filter(site == "YEM_B_GAM") %>% 
 #   select(-triage_site)
+
+# d_prev <- llutils::list_files(
+#   path_export_global,
+#   "msf_covid19_linelist_global_.*.rds",
+#   select = "latest"
+# ) %>%
+#   readRDS()
 
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
@@ -183,8 +191,7 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
   mutate(db_row = 1:n()) %>% 
   mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type") %>% 
   mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) %>% 
-  filter(!(site == "CAF_A_BBY" & is.na(report_date) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
-
+  filter(!(site == "CAF_A_BBY" & is.na(patcourse_asymp) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
 
 
 # double-check for allowed values
@@ -197,14 +204,12 @@ matchmaker::check_df(
 )
 
 
-
 ### Write global export
 if (FALSE) {
   path_out_global <- file.path(path_export_global, glue::glue("msf_covid19_linelist_global_{lubridate::today()}"))
   llutils::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
   saveRDS(d_global, paste0(path_out_global, ".rds"))
 }
-
 
 
 ### Country-specific exports
@@ -214,7 +219,6 @@ purrr::walk(
   d_global = d_global,
   path_export_country = path_export_country
 )
-
 
 
 
