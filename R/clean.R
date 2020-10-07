@@ -79,10 +79,10 @@ clean_linelist <- function(dat,
   ## prepare dictionary
   dict_numeric_prep <- dict_numeric_correct %>% 
     mutate_at(vars(patient_id, variable, value), as.character) %>% 
-    mutate_at(vars(replacement), as.integer) %>% 
+    mutate(replacement = if_else(replacement == ".na", NA_character_, replacement)) %>% 
+    mutate_at(vars(replacement), as.numeric) %>% 
     mutate(replace = TRUE) %>% 
     select(-new)
-    
   
   ## gather numeric variables, convert to numeric, and apply dictionary
   dat_numeric <- dat %>%
@@ -94,7 +94,7 @@ clean_linelist <- function(dat,
            Comcond_present,
            outcome_contacts_followed) %>% 
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
-    mutate(value_numeric = suppressWarnings(as.integer(value))) %>% 
+    mutate(value_numeric = suppressWarnings(as.numeric(value))) %>% 
     left_join(dict_numeric_prep, by = c("patient_id", "variable", "value")) %>% 
     mutate(replace = ifelse(is.na(replace), FALSE, replace)) %>% 
     mutate(value_numeric = ifelse(replace, replacement, value_numeric)) %>% 
