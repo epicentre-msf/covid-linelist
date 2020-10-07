@@ -37,6 +37,7 @@ dat_clean <- llutils::list_files(
   mutate(upload_date = as.character(upload_date))
 
 
+
 ### Run all queries
 df_queries <- dplyr::bind_rows(
   queries_ident(dat_raw, dat_clean),
@@ -48,11 +49,22 @@ df_queries <- dplyr::bind_rows(
   anti_join(sites_query_exclude, by = c("query_id", "site")) %>% 
   select(-any_of(paste0("variable", 4:9)), -any_of(paste0("value", 4:9)))
 
-
 df_queries_join <- df_queries %>%
   select(c("site", "MSF_N_Patient", "query_id", "linelist_row", "variable1", "variable2")) %>%
   unique() %>%
   mutate(resolved_join = FALSE)
+
+
+# df_queries %>%
+#   count(query_id, sort = T) %>%
+#   left_join(query_defs)
+# 
+# df_queries %>%
+#   filter(query_id == "CATEG_01") %>%
+#   count(variable1, value1, sort = TRUE)
+# 
+# df_queries %>%
+#   count(site, sort = TRUE)
 
 
 ### Queries old
@@ -71,17 +83,20 @@ query_tracker_files <- purrr::map(
   select = "latest"
 ) %>% unlist()
 
-
 queries_written_site <- purrr::map_dfr(
   query_tracker_files,
   read_query_trackers
 ) %>% 
   rename(!!query_recode_inv) %>% 
   select(-i) %>% 
+  mutate(
+    site = if_else(site == "PAK_A_TIM", "PAK_B_TIM", site),
+    site = if_else(site == "PAK_A_TIM", "PAK_B_TIM", site)
+  ) %>% 
   mutate(across(c(linelist_row), as.integer)) %>% 
   select(-any_of(c("exclude")), -any_of(paste0("variable", 4:9)), -any_of(paste0("value", 4:9))) %>% 
-  relocate(c(variable3, value3), .after = "value2") %>% 
-  mutate(resolved_field = dplyr::if_else(!is.na(date_resolved_field), "Resolved", resolved_field)) %>% 
+  # relocate(c(variable3, value3), .after = "value2") %>% 
+  # mutate(resolved_field = dplyr::if_else(!is.na(date_resolved_field), "Resolved", resolved_field)) %>% 
   mutate(date_resolved_field = as.character(parse_dates(date_resolved_field)))
 
 
@@ -120,6 +135,16 @@ queries_new <- df_queries %>%
     date_generated = as.character(lubridate::today()),
     resolved_auto = "No"
   )
+
+# queries_new %>%
+#   count(query_id, description, sort = TRUE)
+# 
+# queries_new %>%
+#   count(site, description, sort = TRUE)
+# 
+# queries_new %>%
+#   filter(site == "PAK_B_TIM", query_id == "CATEG_01") %>%
+#   count(variable1, value1, sort = TRUE)
 
 queries_new_no_group <- queries_new %>% 
   filter(is.na(query_group)) %>% 

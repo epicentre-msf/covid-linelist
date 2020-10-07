@@ -1,5 +1,21 @@
 
 
+collapse_name <- function(..., collapse = "; ") {
+  m <- cbind(...)
+  apply(m, 1, collapse_name_, collapse = collapse)
+}
+
+
+collapse_name_ <- function(x, collapse) {
+  if (all(is.na(x))) {
+    out <- NA
+  } else {
+    out <- paste(x[!is.na(x)], collapse = collapse)
+  }
+  return(out)
+}
+
+
 drop_unnamed_columns <- function(x) {
   x[nchar(names(x)) > 0]
 }
@@ -461,6 +477,8 @@ query_recode <- c(
   "Value 1" = "value1",
   "Variable 2" = "variable2",
   "Value 2" = "value2",
+  "Variable 3" = "variable3",
+  "Value 3" = "value3",
   "Date query generated" = "date_generated",
   "Resolved (auto)" = "resolved_auto",
   "Date resolved (auto)" = "date_resolved_auto",
@@ -481,14 +499,17 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   }
   
   queries_resolved <- queries_out %>% 
-    filter(resolved_auto %in% c("Yes", "Resolved", "Removed") | resolved_field %in% c("Resolved")) %>% 
+    filter(resolved_auto %in% c("Yes", "Resolved", "Removed") | resolved_field %in% c("Resolved", "Not resolvable")) %>% 
     mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
   
   queries_outstanding <- queries_out %>% 
-    filter(resolved_auto %in% c("No", "Unresolved") & !resolved_field %in% c("Resolved")) %>% 
+    filter(resolved_auto %in% c("No", "Unresolved") & !resolved_field %in% c("Resolved", "Not resolvable")) %>% 
+    mutate(date_resolved_auto = NA_character_) %>% 
     mutate(i = integer_id(paste(site, query_group)) %% 2, .before = 1)
   
-  unique(queries_out$resolved_auto)
+  if (nrow(queries_resolved) + nrow(queries_outstanding) != nrow(queries_out)) {
+    stop("Error splitting queries between 'resolved' and 'unresolved'")
+  }
   
   queries_summary <- queries_out %>% 
     mutate(status = case_when(
@@ -568,50 +589,125 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
   wb <- openxlsx::createWorkbook()
   hs <- openxlsx::createStyle(halign = "center", textDecoration = "Bold")
   la <- openxlsx::createStyle(halign = "left")
+  cell_unlock <- openxlsx::createStyle(locked = FALSE)
+  
+  # worksheets
+  openxlsx::addWorksheet(wb, "Current", zoom = 130)
+  openxlsx::addWorksheet(wb, "Resolved", zoom = 130)
+  openxlsx::addWorksheet(wb, "Summary", zoom = 130)
+  addWorksheet(wb, "Options", visible = FALSE)
+  
+  # protection
+  protectWorksheet(
+    wb,
+    1,
+    protect = TRUE,
+    password = "covidQueries",
+    lockInsertingColumns = TRUE,
+    lockInsertingRows = TRUE,
+    lockDeletingColumns = TRUE,
+    lockDeletingRows = TRUE,
+    lockSorting = FALSE,
+    lockAutoFilter = FALSE
+  )
+  protectWorksheet(
+    wb,
+    2,
+    protect = TRUE,
+    password = "covidQueries",
+    lockInsertingColumns = TRUE,
+    lockInsertingRows = TRUE,
+    lockDeletingColumns = TRUE,
+    lockDeletingRows = TRUE,
+    lockSorting = FALSE,
+    lockAutoFilter = FALSE
+  )
+  
+  # write data validation values to sheet 4
+  resolved_options <- c(
+    "Resolved", 
+    "Unresolved",
+    "Not resolvable"
+  )
+  
+  writeData(wb, 4, x = resolved_options, startCol = 1, startRow = 1)
+  setColWidths(wb, 4, cols = 1, widths = "auto")
   
   # column widths
   col_w <- c(
     6, 15, 14,        # i - Query #
     10, 12, 13, 15,   # OC - Upload date
     20, 15, 20, 15,   # # Patient - Query ID
-    120, 40, 30, 40, 30, 40, 30, # Description - Value 3
+    140, 40, 30, 40, 30, 40, 30, # Description - Value 3
     22, 17, 22, 17, 22, 70
   )
   
   # sheet 1 (Main query tracker)
-  openxlsx::addWorksheet(wb, "Current", zoom = 130)
   openxlsx::writeData(wb, 1, queries_outstanding, withFilter = TRUE)
   openxlsx::setColWidths(wb, 1, cols = 1:ncol(queries_outstanding), widths = col_w)
   openxlsx::freezePane(wb, 1, firstActiveRow = 2)
   openxlsx::addStyle(wb, 1, style = hs, rows = 1, cols = 1:ncol(queries_outstanding), gridExpand = TRUE)
   openxlsx::addStyle(wb, 1, style = la, rows = 2:(nrow(queries_outstanding) + 1L), cols = 1:ncol(queries_outstanding), gridExpand = TRUE)
-  openxlsx::conditionalFormatting(wb, 1,
-                                  cols = 1:ncol(queries_outstanding),
-                                  rows = 2:(nrow(queries_outstanding) + 1L),
-                                  rule = paste0("$A2>0"),
-                                  style = openxlsx::createStyle(bgFill = "#fddbc7"))
+  openxlsx::addStyle(
+    wb, 1, style = cell_unlock,
+    rows = 2:(nrow(queries_outstanding) + 1L),
+    cols = grep("field", names(queries_outstanding)),
+    gridExpand = TRUE
+  )
+  openxlsx::conditionalFormatting(
+    wb, 1,
+    cols = 1:ncol(queries_outstanding),
+    rows = 2:(nrow(queries_outstanding) + 1L),
+    rule = paste0("$A2>0"),
+    style = openxlsx::createStyle(bgFill = "#fddbc7")
+  )
+  dataValidation(
+    wb, 1, col = which(names(queries_outstanding) %in% "Resolved (field)"),
+    rows = 2:(nrow(queries_outstanding) + 1L),
+    type = "list", value = "'Options'!$A$1:$A$3",
+    allowBlank = TRUE, showInputMsg = TRUE, showErrorMsg = TRUE
+  )
+  # dataValidation(
+  #   wb, 1, col = which(names(queries_outstanding) %in% "Date resolved (field)"),
+  #   rows = 2:(nrow(queries_outstanding) + 1L),
+  #   type = "date", operator = "greaterThanOrEqual", value = as.Date("2020-05-01"),
+  #   allowBlank = TRUE, showInputMsg = TRUE, showErrorMsg = TRUE
+  # )
   
   # sheet 2 (Resolved queries)
-  openxlsx::addWorksheet(wb, "Resolved", zoom = 130)
   openxlsx::writeData(wb, 2, queries_resolved, withFilter = TRUE)
   openxlsx::setColWidths(wb, 2, cols = 1:ncol(queries_resolved), widths = col_w)
   openxlsx::freezePane(wb, 2, firstActiveRow = 2)
   openxlsx::addStyle(wb, 2, style = hs, rows = 1, cols = 1:ncol(queries_resolved), gridExpand = TRUE)
   openxlsx::addStyle(wb, 2, style = la, rows = 2:(nrow(queries_resolved) + 1L), cols = 1:ncol(queries_resolved), gridExpand = TRUE)
-  openxlsx::conditionalFormatting(wb, 2,
-                                  cols = 1:ncol(queries_resolved),
-                                  rows = 2:(nrow(queries_resolved) + 1L),
-                                  rule = paste0("$A2>0"),
-                                  style = openxlsx::createStyle(bgFill = "#fddbc7"))
+  openxlsx::addStyle(
+    wb, 2, style = cell_unlock,
+    rows = 2:(nrow(queries_resolved) + 1L),
+    cols = grep("field", names(queries_resolved)),
+    gridExpand = TRUE
+  )
+  openxlsx::conditionalFormatting(
+    wb, 2,
+    cols = 1:ncol(queries_resolved),
+    rows = 2:(nrow(queries_resolved) + 1L),
+    rule = paste0("$A2>0"),
+    style = openxlsx::createStyle(bgFill = "#fddbc7")
+  )
+  dataValidation(
+    wb, 2,
+    col = which(names(queries_resolved) %in% "Resolved (field)"),
+    rows = 2:(nrow(queries_resolved) + 1L),
+    type = "list", value = "'Options'!$A$1:$A$3",
+    allowBlank = TRUE, showInputMsg = TRUE, showErrorMsg = TRUE
+  )
   
   # sheet 3 (summary)
-  openxlsx::addWorksheet(wb, "Summary", zoom = 130)
   openxlsx::writeData(wb, 3, queries_summary)
   openxlsx::freezePane(wb, 3, firstActiveRow = 2)
   openxlsx::addStyle(wb, 3, style = hs, rows = 1, cols = 1:ncol(queries_summary), gridExpand = TRUE)
   openxlsx::addStyle(wb, 3, style = la, rows = 2:(nrow(queries_summary) + 1L), cols = 1:ncol(queries_summary), gridExpand = TRUE)
   openxlsx::setColWidths(wb, 3, cols = 1:ncol(queries_summary),
-                         widths = c(21, 15, 15, 15, 15, 15, 15, 110))
+                         widths = c(21, 15, 15, 15, 15, 15, 15, 160))
   
   suppressMessages(
     openxlsx::saveWorkbook(
@@ -621,7 +717,6 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
     )
   )
 }
-
 
 
 
