@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "VEN"
+    country <- "IRQ"
     write_checks <- TRUE
   }
   
@@ -48,7 +48,6 @@ clean_geo <- function(country,
                     remove = FALSE) %>% 
     select(all_of(col_order), matches("^adm[[:digit:]]_name")) %>% 
     mutate(across(all_of(adm_cols), ~ ifelse(.x == "", NA_character_, .x)))
-  
   
   ## geo reference file
   georef_file <- file.path(
@@ -82,8 +81,12 @@ clean_geo <- function(country,
       full.names = TRUE
     ) %>%
       purrr::map_dfr(readxl::read_xlsx, guess_max = 5000) %>%
-      mutate(across(where(is.logical), as.character))
-    
+      mutate(across(where(is.logical), as.character)) %>% 
+      mutate(across(any_of(c("adm1", "adm2", "adm3", "adm4")), ~ stringr::str_squish(toupper(.x)))) %>% 
+      select(-any_of(c("i", "new"))) %>% 
+      unique() %>% 
+      select(starts_with("adm"), starts_with("ref"), any_of("pcode"), any_of("match_type"), starts_with("level"), everything())
+      
     if (nrow(df_manual_check_full) == 0) {
       df_manual_check_full <- tibble(
         adm1 = character(0),
@@ -93,6 +96,11 @@ clean_geo <- function(country,
         pcode_new = character(0)
       )
     }
+    
+    df_manual_check_join <- df_manual_check_full %>% 
+      select(starts_with("adm"), pcode_new) %>% 
+      unique() %>% 
+      mutate(new = FALSE)
     
     df_geo_manual <- df_manual_check_full %>% 
       select(starts_with("adm"), pcode = pcode_new) %>% 
@@ -126,14 +134,20 @@ clean_geo <- function(country,
     ## write file for manual correction
     out_check <- df_match_best %>% 
       janitor::remove_empty("rows") %>% 
-      anti_join(df_manual_check_full, by = raw_names) %>%
-      filter(is.na(match_type) | grepl("settle", match_type)) %>% 
+      mutate(across(c(adm1, adm2, adm3, adm4), toupper)) %>% 
+      left_join(df_manual_check_join, by = raw_names) %>%
       mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
              level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
-      arrange(level_ref, adm1, adm2, adm3, adm4) %>% 
-      mutate(pcode_new = NA_character_, comment = NA_character_)
+      filter(!match_type %in% c("complete", "fuzzy"), match_type == "manual" | level_ref < 3) %>% 
+      unique() %>% 
+      arrange(adm1, adm2, adm3, adm4) %>% 
+      mutate(new = if_else(!new, NA_character_, "Yes")) %>% 
+      mutate(comment = NA_character_) %>% 
+      relocate(c(new, pcode_new), .before = "comment")
     
-    if (write_checks & nrow(out_check) > 0) {
+    n_new <- sum(out_check$new == "Yes", na.rm = TRUE)
+    
+    if (write_checks & n_new > 0) {
       
       # archive previous file
       if (nrow(df_manual_check_full) > 0) {
@@ -141,31 +155,19 @@ clean_geo <- function(country,
         
         llutils::write_simple_xlsx(
           df_manual_check_full,
-          file = file.path(path_corrections_geocodes, "archive", file_out_archive),
-          group = level_raw
+          file = file.path(path_corrections_geocodes, "archive", file_out_archive)
         )
       }
-        
-      # append new checks to old file and write
-      dict_geo_correct_write <- df_manual_check_full %>% 
-        select(-any_of("i")) %>% 
-        mutate(new = NA_character_)
       
-      dict_geo_out <- out_check %>% 
-        mutate(new = "Yes") %>%
-        bind_rows(dict_geo_correct_write, .) %>%
-        distinct(adm1, adm2, adm3, adm4, .keep_all = TRUE) %>% 
-        arrange(level_raw, level_ref)
-      
+      # write new file
       file_out <- glue::glue("geocodes_check_{shape}.xlsx")
       
       llutils::write_simple_xlsx(
-        dict_geo_out,
-        file = file.path(path_corrections_geocodes, file_out),
-        group = level_raw
+        out_check,
+        file = file.path(path_corrections_geocodes, file_out)
       )
       
-      message(nrow(out_check), " new ambiguous geocode(s) written to ", file_out)
+      message(n_new, " new ambiguous geocode(s) written to ", file_out)
     }
     
     pcode_bind <- df_match_best %>% 
