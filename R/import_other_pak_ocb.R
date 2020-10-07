@@ -18,7 +18,6 @@ import_other_pak_ocb <- function(path_linelist_other, dict_linelist) {
   library(hmatch)
   source("R/import_other_pak_ocb.R")
   
-  
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
@@ -51,7 +50,7 @@ import_other_pak_ocb <- function(path_linelist_other, dict_linelist) {
     select(-n)
   
   files_ll <- c(
-    PAK_A_TIM = llutils::list_files(
+    PAK_B_TIM = llutils::list_files(
       path_to_files,
       pattern = "COVID-19 Zero.*\\.xlsx",
       select = "latest"
@@ -65,14 +64,12 @@ import_other_pak_ocb <- function(path_linelist_other, dict_linelist) {
   ) %>% 
     dplyr::left_join(dict_facilities_join, by = "site")
   
-
-  
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$fever_y_n, c("yes", "no", "y", "n", NA))
   test_set_equal(d_orig$cough_y_n, c("yes", "no", "y", "n", NA))
   test_set_equal(d_orig$shortness_of_breath_y_n, c("yes", "no", "y", "n", NA))
   test_set_equal(d_orig$sore_throat_y_n, c("yes", "no", "y", "n", NA))
-  test_set_equal(d_orig$headache_y_n, c("yes", "no", "y", "n", NA))
+  test_set_equal(d_orig$headache_y_n, c("yes", "no", "y", "n", NA, "dm+htn"))
   test_set_equal(d_orig$flu, c("yes", "no", "y", "n", NA))
   test_set_equal(d_orig$close_contacts_of_propbable_confirmed_cases_yes_no_unknown, c("yes", "no", "unknown", "unkonwn", NA))
   test_set_equal(d_orig$first_lab_results, c("positive", "negative", "inconclusive", ".", NA))
