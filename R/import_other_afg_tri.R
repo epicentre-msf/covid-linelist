@@ -8,7 +8,6 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   source("R/utilities.R")
   source("R/import_other_afg_tri.R")
   
-  
   ### Read linelist
   file_ll <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
@@ -35,11 +34,11 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   test_set_equal(d_orig$if_positive_on_arv, c("yes", "no", "unknown", NA))
   test_set_equal(d_orig$previous_test_result, c("pasitive", "positive", "negative", "unknown", NA))
   test_set_equal(d_orig$lab_result, c("indeterminate", NA))
-  test_set_equal(d_orig$category_according_to_clinical_examination, c("critical", "severe", "moderate", "mild", "not a suspect", NA))
+  test_set_equal(d_orig$category_according_to_clinical_examination, c("critical", "severe", "moderate", "mild", "not a suspect", "non recorded", NA))
   test_set_equal(d_orig$sent_for_testing, c("yes", "no", NA))
   test_set_equal(d_orig$other_immunodeficiency, c("yes", "no","unknown",  NA))
   test_set_equal(d_orig$malignancy_cancer, c("yes", "no", "unknown", NA))
-  
+
   ### Constants and derived variables
   d_derived <- d_orig %>% 
     # site metadata
@@ -63,22 +62,30 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       tolower(does_the_patient_have_symptoms) == "no" ~ "Yes"
     )) %>% 
     # derive Comcond_immuno
-    mutate(across(c(hiv_status, other_immunodeficiency, malignancy_cancer), tolower)) %>% 
+    mutate(
+      across(c(hiv_status, other_immunodeficiency, malignancy_cancer), tolower),
+      hiv_status = if_else(hiv_status == "no", "negative", hiv_status)
+    ) %>% 
     mutate(Comcond_immuno = case_when(
       hiv_status == "positive" | other_immunodeficiency == "yes" | malignancy_cancer == "yes" ~ "Yes",
-      TRUE ~ NA_character_
+      hiv_status == "negative" & other_immunodeficiency == "no" & malignancy_cancer == "no" ~ "No",
+      is.na(hiv_status) & is.na(other_immunodeficiency) & is.na(malignancy_cancer) ~ NA_character_,
+      TRUE ~ "Unknown"
     )) %>% 
     # derive MSF_hiv_status
-    mutate(across(c(hiv_status, if_positive_on_arv), tolower)) %>% 
-    mutate(MSF_hiv_status = case_when(
-      hiv_status == "positive" & if_positive_on_arv == "yes" ~ "Positive (on ARV)",
-      hiv_status == "positive" & if_positive_on_arv == "no" ~ "Positive (no ARV)",
-      hiv_status == "positive" & !if_positive_on_arv %in% c("yes", "no") ~ "Positive (unknown ARV)",
-      hiv_status %in% c("no", "negative") ~ "Negative",
-      hiv_status == "unknown" ~ "Unknown"
-    )) %>% 
+    mutate(
+      across(if_positive_on_arv, tolower),
+      MSF_hiv_status = case_when(
+        hiv_status == "positive" & if_positive_on_arv == "yes" ~ "Positive (on ARV)",
+        hiv_status == "positive" & if_positive_on_arv == "no" ~ "Positive (no ARV)",
+        hiv_status == "positive" & !if_positive_on_arv %in% c("yes", "no") ~ "Positive (unknown ARV)",
+        hiv_status %in% c("no", "negative") ~ "Negative",
+        hiv_status == "unknown" ~ "Unknown"
+      )
+    ) %>% 
     # derive MSF_covid_status
     mutate(across(c(previous_test_result, lab_result, category_according_to_clinical_examination, sent_for_testing), tolower)) %>% 
+    mutate(category_according_to_clinical_examination = if_else(category_according_to_clinical_examination == "non recorded", NA_character_, category_according_to_clinical_examination)) %>% 
     mutate(previous_test_result = recode(previous_test_result, "pasitive" = "positive")) %>% 
     mutate(MSF_covid_status = case_when(
       previous_test_result == "positive" | lab_result == "positive"	~ "Confirmed",
@@ -92,7 +99,10 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       MSF_refer_to = ifelse(referral == "Other:", if_other_61, referral),
       MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
     )
-  
+
+  # d_derived %>%
+  #   count(Comcond_immuno, hiv_status, other_immunodeficiency, malignancy_cancer) %>% 
+  #   print(n = "all")
   
   # # examine variable combos relating to derivation of MSF_covid_status
   # d_derived %>%
