@@ -37,7 +37,6 @@ dat_clean <- llutils::list_files(
   mutate(upload_date = as.character(upload_date))
 
 
-
 ### Run all queries
 df_queries <- dplyr::bind_rows(
   queries_ident(dat_raw, dat_clean),
@@ -200,6 +199,6 @@ if (FALSE) {
 
 # write site-specific query trackers
 if (FALSE) {
-  write_query_tracker_site(queries_out)
+  write_query_tracker_site(queries_out, path_export_fp = path_export_fp)
 }
 

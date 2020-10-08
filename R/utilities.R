@@ -720,7 +720,9 @@ write_query_tracker <- function(queries_out, site_focal = NULL, path) {
 
 
 
-write_query_tracker_site <- function(queries_out, OC_focal) {
+write_query_tracker_site <- function(queries_out,
+                                     OC_focal,
+                                     path_export_fp) {
   
   if (!missing(OC_focal)) {
     queries_out <- filter(queries_out, OC %in% OC_focal)
