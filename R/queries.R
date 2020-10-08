@@ -192,7 +192,7 @@ queries_out <- queries_full %>%
 
 # write global query tracker
 if (FALSE) {
-  write_query_tracker(queries_out, path = file.path(path_queries, glue::glue("query_tracker_{today()}.xlsx")))
+  write_query_tracker(queries_out, path = file.path(path_queries, "trackers", glue::glue("query_tracker_{today()}.xlsx")))
 }
 
 
