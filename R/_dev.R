@@ -50,7 +50,7 @@ source("R/import_other_bgd_godata_ocp_crf1.R")
 
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
-ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist)
+# ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist) # new export to data-raw/COD seems to overlap and supersede
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_ind_ocb <- import_other_ind_ocb(path_linelist_other, dict_linelist)
 ll_other_irq_ocb <- import_other_irq_ocb(path_linelist_other, dict_linelist)
@@ -67,7 +67,7 @@ ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
   ll_other_afg_tri,
   ll_other_bel_ocb,
-  ll_other_cod_oca,
+  # ll_other_cod_oca,
   ll_other_hti_ocb,
   ll_other_ind_ocb,
   ll_other_irq_ocb,
@@ -117,7 +117,7 @@ ll_cleaned <- ll_import %>%
     dict_numeric_correct,
     dict_factors_correct,
     dict_countries_correct,
-    write_checks = TRUE
+    write_checks = FALSE
   )
 
 
@@ -137,8 +137,10 @@ ll_geocode <- purrr::map_dfr(
   clean_geo,
   path_corrections_geocodes = path_corrections_geocodes,
   path_shapefiles = path_shapefiles,
-  write_checks = TRUE
+  write_checks = FALSE
 )
+
+
 
 
 # fetch_georef("VEN") %>%
