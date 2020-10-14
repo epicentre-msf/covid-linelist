@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "IRQ"
+    country <- "VEN"
     write_checks <- TRUE
   }
   
@@ -131,17 +131,19 @@ clean_geo <- function(country,
     }
     # update hmatch to handle when adm4 NA and level == 4
     
+    
+    
     ## write file for manual correction
     out_check <- df_match_best %>% 
       janitor::remove_empty("rows") %>% 
-      mutate(across(c(adm1, adm2, adm3, adm4), toupper)) %>% 
+      mutate(across(c(adm1, adm2, adm3, adm4), ~ stringr::str_squish(toupper(.x)))) %>% 
       left_join(df_manual_check_join, by = raw_names) %>%
       mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
              level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
       filter(!match_type %in% c("complete", "fuzzy"), match_type == "manual" | level_ref < 3) %>% 
       unique() %>% 
       arrange(adm1, adm2, adm3, adm4) %>% 
-      mutate(new = if_else(!new, NA_character_, "Yes")) %>% 
+      mutate(new = if_else(is.na(new), "Yes", NA_character_)) %>% 
       mutate(comment = NA_character_) %>% 
       relocate(c(new, pcode_new), .before = "comment")
     
