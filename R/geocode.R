@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "VEN"
+    country <- "COL"
     write_checks <- TRUE
   }
   
@@ -80,14 +80,16 @@ clean_geo <- function(country,
       pattern = paste0("geocodes_check_", shape),
       full.names = TRUE
     ) %>%
-      purrr::map_dfr(readxl::read_xlsx, guess_max = 5000) %>%
-      mutate(across(where(is.logical), as.character)) %>% 
-      mutate(across(any_of(c("adm1", "adm2", "adm3", "adm4")), ~ stringr::str_squish(toupper(.x)))) %>% 
-      select(-any_of(c("i", "new"))) %>% 
-      unique() %>% 
-      select(starts_with("adm"), starts_with("ref"), any_of("pcode"), any_of("match_type"), starts_with("level"), everything())
-      
-    if (nrow(df_manual_check_full) == 0) {
+      purrr::map_dfr(readxl::read_xlsx, guess_max = 5000)
+    
+    if (nrow(df_manual_check_full) > 0) {
+      df_manual_check_full <- df_manual_check_full %>%
+        mutate(across(where(is.logical), as.character)) %>% 
+        mutate(across(any_of(c("adm1", "adm2", "adm3", "adm4")), ~ stringr::str_squish(toupper(.x)))) %>% 
+        select(-any_of(c("i", "new"))) %>% 
+        unique() %>% 
+        select(starts_with("adm"), starts_with("ref"), any_of("pcode"), any_of("match_type"), starts_with("level"), everything())
+    } else {
       df_manual_check_full <- tibble(
         adm1 = character(0),
         adm2 = character(0),
@@ -124,7 +126,6 @@ clean_geo <- function(country,
     ) %>% 
       select(-level) %>% 
       mutate_all(as.character)
-    
     
     if (nrow(df_match_best) > nrow(df_geo_raw)) {
       warning("rows duplicated by hmatch::hmatch(), country ", country, call. = FALSE)
