@@ -46,12 +46,12 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
     ),
     BGD_A_KUT = llutils::list_files(
       path_to_files_oca,
-      pattern = "BGD_CXB_KTP.*\\.xlsx",
+      pattern = "^BGD_CXB_KTP.*\\.xlsx",
       select = "latest"
     ),
     BGD_A_BAL = llutils::list_files(
       path_to_files_oca,
-      pattern = "BGD_CXB_BKL.*\\.xlsx",
+      pattern = "^BGD_CXB_BKL.*\\.xlsx",
       select = "latest"
     ),
     BGD_P_IPD = llutils::list_files(
