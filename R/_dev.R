@@ -39,7 +39,7 @@ source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
-source("R/import_other_ind_ocb.R")
+source("R/import_other_ind_ocb.R") # newest export requires new mapping template
 source("R/import_other_irq_ocb.R")
 source("R/import_other_pak_ocb.R")
 source("R/import_other_yem_ocb_moh.R") # still using MoH version for now
@@ -60,6 +60,7 @@ ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
 ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
+
 
 
 ### Bind Intersectional and Other imports
@@ -142,12 +143,11 @@ ll_geocode <- purrr::map_dfr(
 
 
 
-
 # fetch_georef("VEN") %>%
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("YEM"))
+# View(fetch_georef("SSD"))
 
 
 # check again for missing values among important columns
@@ -166,34 +166,17 @@ purrr::walk(
 
 
 ### Compile global linelist
-# d_previous_yem_b_gam <- llutils::list_files(
-#   path_export_global,
-#   "msf_covid19_linelist_global_.*.rds",
-#   select = "latest"
-# ) %>% 
-#   readRDS() %>% 
-#   filter(site == "YEM_B_GAM") %>% 
-#   select(-triage_site)
-
-# d_prev <- llutils::list_files(
-#   path_export_global,
-#   "msf_covid19_linelist_global_.*.rds",
-#   select = "latest"
-# ) %>%
-#   readRDS()
-
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
   derive_event_date() %>% 
   select(-starts_with("MSF_variable_additional")) %>%
   select(-starts_with("extra"), everything(), starts_with("extra")) %>% 
   rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
-  # bind_rows(d_previous_yem_b_gam) %>% 
   arrange(site) %>% 
   mutate(db_row = 1:n()) %>% 
   mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type") %>% 
-  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) %>% 
-  filter(!(site == "CAF_A_BBY" & is.na(patcourse_asymp) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
+  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) # %>% 
+  # filter(!(site == "CAF_A_BBY" & is.na(patcourse_asymp) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
 
 
 # double-check for allowed values
@@ -221,7 +204,6 @@ purrr::walk(
   d_global = d_global,
   path_export_country = path_export_country
 )
-
 
 
 ### Write OC-specific files
