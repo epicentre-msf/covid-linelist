@@ -30,10 +30,15 @@ import_other_irq_ocb <- function(path_linelist_other, dict_linelist) {
     select(1, 7, 8, 9, 10) %>% 
     setNames(c("var_epi", "map_type", "map_direct", "map_constant", "map_derive"))
   
-  df_map_direct <- df_map %>% 
+  df_map_direct_raw <- df_map %>% 
     filter(map_type == "1:1 correspondence") %>% 
-    select(var_epi, map_direct) %>% 
-    mutate(map_direct_std = janitor::make_clean_names(map_direct))
+    select(var_epi, map_direct)
+  
+  df_map_direct <- df_map_direct_raw %>% 
+    select(map_direct) %>% 
+    unique() %>% 
+    mutate(map_direct_std = janitor::make_clean_names(map_direct)) %>% 
+    left_join(df_map_direct_raw, ., by = "map_direct")
   
   vec_map_direct <- setNames(df_map_direct$map_direct_std, df_map_direct$var_epi)
   
@@ -64,6 +69,14 @@ import_other_irq_ocb <- function(path_linelist_other, dict_linelist) {
   
   ### Check for unseen values in derivation variables
   test_set_equal(
+    d_orig$covid_status,
+    c("confirmed", "suspect", NA)
+  )
+  test_set_equal(
+    d_orig$ad_sample1_results,
+    c("positive", "negative", "unknown", NA)
+  )
+  test_set_equal(
     d_orig$type_of_visit,
     c("first_hosp", "re-hosp", "first_hosp_after_other_cons", NA)
   )
@@ -71,6 +84,7 @@ import_other_irq_ocb <- function(path_linelist_other, dict_linelist) {
     d_orig$outcome,
     c("death", "other", "lama", "discharged - unknown", "discharged - cured", "discharged - isolation", "referral to hcf", "discharged - not a case", NA)
   )
+  
   
   # d_derive %>%
   #   count(governorate, district, subdistrict, MSF_admin_location_past_week)
@@ -81,12 +95,28 @@ import_other_irq_ocb <- function(path_linelist_other, dict_linelist) {
   # d_derive %>%
   #   count(outcome, outcome_patcourse_status)
   
+  # d_derive %>% 
+  #   count(MSF_covid_status, covid_status, ad_sample1_results, diagnosis_at_discharge) %>% 
+  #   print(n = "all")
+  
+  # d_derive %>% 
+  #   mutate(if_referred_for_care_isolation_hospital = tolower(if_referred_for_care_isolation_hospital)) %>% 
+  #   count(MSF_refer_to, if_referred_for_care_isolation_hospital, sort = TRUE)
   
   ### Derived variables
   d_derive <- d_orig %>% 
     # derive MSF_admin_location_past_week
     mutate(across(governorate:subdistrict, ~ ifelse(is.na(.x), "", .x))) %>% 
     unite("MSF_admin_location_past_week", governorate:subdistrict, sep = " | ", remove = FALSE) %>% 
+    # MSF_covid_status
+    mutate(
+      MSF_covid_status = case_when(
+        tolower(covid_status) == "confirmed" ~ "Confirmed",
+        tolower(ad_sample1_results) == "positive" ~ "Confirmed",
+        tolower(diagnosis_at_discharge) == "covid-19" ~ "Confirmed",
+        TRUE ~ "Suspect"
+      )
+    ) %>% 
     # MSF_visit_type
     mutate(
       type_of_visit = tolower(type_of_visit),
@@ -94,6 +124,13 @@ import_other_irq_ocb <- function(path_linelist_other, dict_linelist) {
         type_of_visit %in% "first_hosp" ~ "First hospitalisation",
         type_of_visit %in% "re-hosp" ~ "Rehospitalisation",
         type_of_visit %in% "first_hosp_after_other_cons" ~ "First hospitalisation after a consultation"
+      )
+    ) %>% 
+    # MSF_refer_to
+    mutate(
+      MSF_refer_to = case_when(
+        grepl("home", if_referred_for_care_isolation_hospital, ignore.case = TRUE) ~ NA_character_,
+        TRUE ~ if_referred_for_care_isolation_hospital
       )
     ) %>% 
     # outcome_patcourse_status
