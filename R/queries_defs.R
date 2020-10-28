@@ -302,15 +302,81 @@ queries_multi <- function(dat_raw, dat_clean) {
   # MULTI_33 Type of visit correspond to a form of re-admission/consultation but former ID is missing
   # queries[["MULTI_33"]] <- query(dat_clean, MSF_visit_type %in% c("First hospitalisation after a consultation", "Rehospitalisation") & is.na(MSF_former_ID_readmission))
   
+  # MULTI_34	Multi-variable logic	"Other reason for being tested" wrongly entered (corresponds to existing option)	report_test_reason_other, report_test_reason
+  reasons_incorrect <- c(
+    "CASO SOSPECHOSO DE SARS COV-2",
+    "COMMUNITY TESTING",
+    "CONTACTO CON UN CASO SOSPECHOSO",
+    "DESCARTE PARA TRANSITO TERRITORIO NACIONAL",
+    "FIEVRE, MYOGIE",
+    "PATIENT WAS ADMITTED IN ICU AND SUSPECTED OF COVID-19",
+    "PERSONNE ENTRANT SUR LE TERRITOIRE",
+    "PERSONNE MALADE EN PROVENANCE D'UN PAYS TOUCHE PAR LE COVID-19",
+    "PRESENTA SINTOMAS",
+    "RANDOM TESTING",
+    "ROUTINE RESPIRATORY DISEASE SURVEILLANCE SYSTEM",
+    "ROUTINE RESPIRATORY DISEASE SURVEILLANCE SYSTEMS",
+    "ROUTINE RESPIRATORY SURVEILLANCE SYSTEMS",
+    "SUIVI DE PERSONNES ENTRANT SUR LE TERRITOIRE",
+    "SUSPICION DE COVID-19",
+    "SYMPTOMATIC CONTACT OF A SUSPECTED CASE",
+    "TESTEO MASIVO-CONFIRMADO CDI",
+    "VIENT POUR SUSPICION DE COVID-19"
+  )
+  
+  queries[["MULTI_34"]] <- query(dat_clean, report_test_reason %in% c("Other", "Unknown", NA) & string_std_lite(report_test_reason_other) %in% reasons_incorrect)
+  
+  # dat_clean %>% 
+  #   filter(report_test_reason %in% c("Other", "Unknown", NA)) %>% 
+  #   mutate(report_test_reason_other = string_std_lite(report_test_reason_other)) %>% 
+  #   count(report_test_reason_other, sort = TRUE) %>% 
+  #   print(n = 50)
+  
+  
+  
+  
+  # MULTI_35 Multi-variable logic	"Other outcome" wrongly entered (corresponds to existing option)
+  outcome_incorrect <- c(
+    "ABSCONDED",
+    "ADMITTED IN ISOLATION",
+    "AISLAMIENTO DOMICILIARIO",
+    "ASILAMIENTO EN CASA",
+    "CLINICALLY CURED",
+    "CURED",
+    "DAMA",
+    "EN CASA EN ESPERA DE RESULTADO",
+    "ESCAPED",
+    "EVADE",
+    "EVADIU",
+    "EVASION",
+    "MEDICAL RELEASE",
+    "NON CAS",
+    "NOT A CASE",
+    "NOT CASE",
+    "REFERRAL",
+    "REFUSED ADMISSION",
+    "SHIFT TO PAEDI WARD",
+    "TRANSFERRED TO ANOTHER WARD",
+    "VIGILANCIA DOMICILIARIA"
+  )
+  
+  queries[["MULTI_35"]] <- query(dat_clean, outcome_patcourse_status %in% c("Other", NA) & string_std_lite(outcome_patcourse_status_other) %in% outcome_incorrect)
   
   # MULTI_36 Asymptomatic is 'Yes' but some symptoms are recorded as 'Yes'
   cols_symptom <- grep("MSF_symptom(?!.*date_onset$)", value = TRUE, names(dat_clean), perl = TRUE)
   queries[["MULTI_36"]] <- query(dat_clean, patcourse_asymp == "Yes" & .x == "Yes", cols_dotx = all_of(cols_symptom))
   
+  # MULTI_37	Multi-variable logic	Patient has 'Positive' result from PCR test but Covid19 status is not 'Confirmed'
+  queries[["MULTI_37"]] <- query(dat_clean, MSF_test_type == "PCR" & MSF_test_results == "Positive" & !MSF_covid_status %in% "Confirmed")
+  
+  # MULTI_38	Multi-variable logic	HIV Status is a form of 'Positive' but Immunodeficiency is not 'Yes' 	MSF_hiv_status, Comcond_immuno 
+  queries[["MULTI_38"]] <- query(dat_clean, grepl("Positive", MSF_hiv_status) & !Comcond_immuno %in% "Yes")
+  
+  
+  
   
   return(bind_query_list(queries))
 }
-
 
 
 queries_other <- function(dat_raw, dat_clean) {

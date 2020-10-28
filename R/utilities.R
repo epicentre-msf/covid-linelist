@@ -1,4 +1,11 @@
 
+string_std_lite <- function(x) {
+  x <- toupper(x)
+  x <- stringr::str_squish(x)
+  x <- stringi::stri_trans_general(x, id = "Latin-ASCII")
+  x
+}
+
 
 collapse_name <- function(..., collapse = "; ") {
   m <- cbind(...)
