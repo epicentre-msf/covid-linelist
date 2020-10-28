@@ -29,7 +29,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$msf_facitity, c("hrh", "idp"))
-  test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", NA))
+  test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", "non recorded", NA))
   test_set_equal(d_orig$hiv_status, c("positive", "negative", "no", "unknown", NA))
   test_set_equal(d_orig$if_positive_on_arv, c("yes", "no", "unknown", NA))
   test_set_equal(d_orig$previous_test_result, c("pasitive", "positive", "negative", "unknown", NA))
