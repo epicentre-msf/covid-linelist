@@ -86,11 +86,10 @@ write_ll_by_country <- function(country_focal,
   }
   
   file_out <- glue::glue("msf_covid19_linelist_{country_focal}_{Sys.Date()}")
-  file_out_rds <- paste0(file_out, ".rds")
+  # file_out_rds <- paste0(file_out, ".rds")
   file_out_xlsx <- paste0(file_out, ".xlsx")
   
-  saveRDS(out, file.path(path_export_country, country_focal, file_out_rds))
-  # llutils::write_simple_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
+  # saveRDS(out, file.path(path_export_country, country_focal, file_out_rds))
   writexl::write_xlsx(out, file.path(path_export_country, country_focal, file_out_xlsx))
 }
 

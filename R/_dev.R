@@ -62,7 +62,6 @@ ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelis
 ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
 
 
-
 ### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
@@ -118,7 +117,7 @@ ll_cleaned <- ll_import %>%
     dict_numeric_correct,
     dict_factors_correct,
     dict_countries_correct,
-    write_checks = FALSE
+    write_checks = TRUE
   )
 
 
@@ -138,7 +137,7 @@ ll_geocode <- purrr::map_dfr(
   clean_geo,
   path_corrections_geocodes = path_corrections_geocodes,
   path_shapefiles = path_shapefiles,
-  write_checks = FALSE
+  write_checks = TRUE
 )
 
 
@@ -147,7 +146,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("SSD"))
+# View(fetch_georef("AFG"))
 
 
 # check again for missing values among important columns
@@ -175,8 +174,23 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
   arrange(site) %>% 
   mutate(db_row = 1:n()) %>% 
   mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type") %>% 
-  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) # %>% 
+  mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) %>% 
   # filter(!(site == "CAF_A_BBY" & is.na(patcourse_asymp) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
+  mutate(
+    OC_OCA = ifelse(grepl("OCA", OC), TRUE, NA),
+    OC_OCB = ifelse(grepl("OCB(?!A)", OC, perl = TRUE), TRUE, NA),
+    OC_OCBA = ifelse(grepl("OCBA", OC), TRUE, NA),
+    OC_OCG = ifelse(grepl("OCG", OC), TRUE, NA),
+    OC_OCP = ifelse(grepl("OCP", OC), TRUE, NA),
+    .after = "OC"
+  )
+
+
+# check for patient_id dropped since previous compilation
+llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>% 
+  readRDS() %>% 
+  anti_join(d_global, by = "patient_id") %>% 
+  count(site)
 
 
 # double-check for allowed values
@@ -189,11 +203,16 @@ matchmaker::check_df(
 )
 
 
+
+
+
+
 ### Write global export
 if (FALSE) {
+  d_global_write <- dplyr::select(d_global, -starts_with("extra_"))
   path_out_global <- file.path(path_export_global, glue::glue("msf_covid19_linelist_global_{lubridate::today()}"))
-  llutils::write_simple_xlsx(d_global, paste0(path_out_global, ".xlsx"))
-  saveRDS(d_global, paste0(path_out_global, ".rds"))
+  writexl::write_xlsx(d_global_write, paste0(path_out_global, ".xlsx"))
+  saveRDS(d_global_write, paste0(path_out_global, ".rds"))
 }
 
 
