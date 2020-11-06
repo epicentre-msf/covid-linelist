@@ -47,7 +47,12 @@ path_dict_countries <- file.path(path_onedrive, "template", "linelist", "dev", "
 path_queries <- file.path(path_cleaning, "queries")
 path_date_figs <- file.path(path_cleaning, "date-figures")
 path_geobase <- file.path(path_onedrive, "template", "linelist", "dev", "base_geo")
-path_implementation <- file.path(path_onedrive, "coordination", "Surveillance focal points coordination", "Logbook LL implementation")
+
+path_coordination <- file.path(path_onedrive, "coordination", "Surveillance focal points coordination")
+path_implementation <- file.path(path_coordination, "Logbook LL implementation")
+path_aggregate_data <- file.path(path_coordination, "Aggregated reporting", "Report_covid_aggregate_all_v2.xlsx")
+path_global_report <- file.path(path_onedrive, "analyses", "global_report")
+
 
 ### Other linelists (AFG triage, YEM, etc.)
 path_linelist_other <- file.path(path_onedrive, "data-raw", "linelist-other")
