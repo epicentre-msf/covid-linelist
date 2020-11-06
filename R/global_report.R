@@ -10,7 +10,6 @@ library(lubridate)
 library(openxlsx)
 
 
-
 ### read latest MSF ll compilation
 d_ll <- llutils::list_files(
   path_export_global,
@@ -19,6 +18,7 @@ d_ll <- llutils::list_files(
   select = "latest"
 ) %>% 
   readRDS()
+
 
 # assorted checks
 # d_ll %>% 
@@ -45,7 +45,6 @@ d_ll <- llutils::list_files(
 #   filter(!is.na(Lab_date1) & is.na(outcome_lab_date) & !is.na(outcome_lab_result)) %>% 
 #   filter(!outcome_lab_result %in% c("Not done", "Negative"))
   
-
 
 # number consultations (not a case/suspected/confirmed/probable)
 # by inpatient, outpatient, unclear
@@ -104,16 +103,16 @@ d_ll_prep <- d_ll %>%
 
 # summarize n_visits, n_confirmed, etc. from MLL linelist compilation
 ll_counts <- d_ll_prep %>% 
-  mutate(project = ifelse(site == "YEM_P_HAY", "YE112", project)) %>%
+  mutate(project = ifelse(site %in% "YEM_P_HAY", "YE112", project)) %>%
   group_by(country, OC, project, site_code = site, site_name, year, month_int, month) %>% 
   summarize(
     n_visits_unknown_type = sum(!visit_type %in% c("OPD", "IPD")),
-    n_visits_opd = sum(visit_type == "OPD"),
-    n_visits_ipd = sum(visit_type == "IPD"),
-    n_confirmed = sum(MSF_covid_status == "Confirmed"),
-    n_severe = sum(severe == "Yes"),
-    n_died = sum(outcome_patcourse_status == "Died"),
-    n_tested = sum(tested == "Yes"),
+    n_visits_opd = sum(visit_type %in% "OPD"),             # == to %in%
+    n_visits_ipd = sum(visit_type %in% "IPD"),             # == to %in%
+    n_confirmed = sum(MSF_covid_status %in% "Confirmed"),  # == to %in%
+    n_severe = sum(severe %in% "Yes"),                     # == to %in%
+    n_died = sum(outcome_patcourse_status %in% "Died"),    # == to %in%
+    n_tested = sum(tested %in% "Yes"),                     # == to %in%
     .groups = "drop"
   ) %>% 
   mutate(
@@ -286,7 +285,7 @@ openxlsx::setColWidths(
 suppressMessages(
   openxlsx::saveWorkbook(
     wb,
-    file = file.path(path_global_report, glue::glue("msf_covid19_global_report_summary_{Sys.Date()}.xlsx")),
+    file = file.path(path_global_report, glue::glue("msf_covid19_global_report_summary_{time_stamp()}.xlsx")),
     overwrite = TRUE
   )
 )
@@ -344,3 +343,36 @@ global_report_ecdc <- counts_full %>%
 #   file.path(path_global_report, glue::glue("msf_covid19_global_report_ECDC_{Sys.Date()}.xlsx"))
 # )
 
+
+
+
+
+# examine bug in death counts
+
+# f1 <- llutils::list_files(path_global_report, "msf_covid19_global_report_summary")[3]
+# f2 <- llutils::list_files(path_global_report, "msf_covid19_global_report_summary")[2]
+# 
+# d1 <- readxl::read_excel(f1, .name_repair = janitor::make_clean_names)
+# d2 <- readxl::read_excel(f2, .name_repair = janitor::make_clean_names)
+# 
+# d1 %>% 
+#   select(starts_with("number")) %>% 
+#   colSums()
+# 
+# d2 %>% 
+#   select(starts_with("number")) %>% 
+#   colSums()
+# 
+# d1j <- d1 %>%
+#   select(country = country_code, oc, site_code = site_code_linelist, site = site_name,
+#          source = data_source, month, deaths_old = matches("deaths"))
+# 
+# d2j <- d2 %>%
+#   select(country = country_code, oc, site_code = site_code_linelist, site = site_name,
+#          source = data_source, month, deaths_new = matches("deaths"))
+# 
+# d1j %>%
+#   left_join(d2j, by = c("country", "oc", "site_code", "site", "source", "month")) %>%
+#   filter(deaths_old != deaths_new) %>%
+#   select(-source) %>%
+#   gt::gt()
