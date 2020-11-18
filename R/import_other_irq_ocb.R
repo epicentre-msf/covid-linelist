@@ -66,7 +66,6 @@ import_other_irq_ocb <- function(path_linelist_other, dict_linelist) {
   ) %>% 
     dplyr::left_join(dict_facilities_join, by = "site")
   
-  
   ### Check for unseen values in derivation variables
   test_set_equal(
     d_orig$covid_status,
@@ -205,7 +204,7 @@ import_irq_ocb_ <- function(path, site) {
   
   readxl::read_xlsx(
     path, 
-    # skip = 1,
+    skip = 3,
     col_types = "text",
     na = c("", "NA"),
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
