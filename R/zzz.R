@@ -72,6 +72,6 @@ date_vars <- c("upload_date", dict_linelist$code_name[dict_linelist$data_type ==
 
 
 ### Vector of ISO3 country codes for which we have linelists in data-raw
-country_dirs <- list_dirs(path_data_raw, pattern = "\\/[[:alpha:]]{3}$")
+country_dirs <- list_dirs(path_data_raw, pattern = "linelist\\/[[:alpha:]]{3}$")
 countries <- stringr::str_sub(country_dirs, start = -3)
 
