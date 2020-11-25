@@ -59,7 +59,8 @@ path_linelist_other <- file.path(path_onedrive, "data-raw", "linelist-other")
 
 ### Read dictionaries
 dict_linelist_v1 <- read_xlsx(file.path(path_dictionaries, "archive", "dict_linelist_v1.1.xlsx")) # corrected MSF_readmission -> MSF_visit_type
-dict_linelist <- read_xlsx(file.path(path_dictionaries, "dict_linelist_v2.0.xlsx"))
+dict_linelist_v2 <- read_xlsx(file.path(path_dictionaries, "dict_linelist_v2.0.xlsx"))
+dict_linelist <- read_xlsx(file.path(path_dictionaries, "dict_linelist_v3.0.xlsx"))
 dict_facilities <- read_xlsx(file.path(path_dictionaries, "dict_facilities.xlsx"))
 dict_factors <- read_xlsx(file.path(path_dictionaries, "dict_factors.xlsx"))
 dict_countries <- read_xlsx(path_dict_countries)
