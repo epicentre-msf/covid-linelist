@@ -37,7 +37,6 @@ clean_linelist <- function(dat,
   ## if running manually
   if (FALSE) {
     dat <- ll_import
-    # dat <- ll_cleaned
     write_checks <- TRUE
   }
   
@@ -51,7 +50,6 @@ clean_linelist <- function(dat,
     mutate(MSF_N_Patient = ifelse(temp_update_ids, temp_MSF_N_Patient, MSF_N_Patient),
            patient_id = ifelse(temp_update_ids, temp_patient_id, patient_id)) %>% 
     select(-temp_update_ids, -temp_MSF_N_Patient, -temp_patient_id)
-  
   
   #### Clean numeric variables -------------------------------------------------
   
@@ -75,7 +73,6 @@ clean_linelist <- function(dat,
     #         paste(unique(comcond_bad), collapse = "; "))
   }
   
-  
   ## prepare dictionary
   dict_numeric_prep <- dict_numeric_correct %>% 
     mutate_at(vars(patient_id, variable, value), as.character) %>% 
@@ -86,20 +83,29 @@ clean_linelist <- function(dat,
   
   ## gather numeric variables, convert to numeric, and apply dictionary
   dat_numeric <- dat %>%
-    select(db_row,
-           patient_id,
-           patinfo_ageonset,
-           MSF_delay_before_admission,
-           MSF_length_stay,
-           Comcond_present,
-           outcome_contacts_followed) %>% 
+    select(
+      db_row,
+      patient_id,
+      patinfo_ageonset,
+      MSF_delay_before_admission,
+      MSF_length_stay,
+      Comcond_present,
+      outcome_contacts_followed
+    ) %>% 
     tidyr::gather(variable, value, -db_row, -patient_id) %>%
     mutate(value_numeric = suppressWarnings(as.numeric(value))) %>% 
     left_join(dict_numeric_prep, by = c("patient_id", "variable", "value")) %>% 
     mutate(replace = ifelse(is.na(replace), FALSE, replace)) %>% 
     mutate(value_numeric = ifelse(replace, replacement, value_numeric)) %>% 
     select(-replacement) %>% 
-    mutate(flag = !is.na(value) & is.na(value_numeric) & !replace)
+    mutate(
+      flag = case_when(
+        !is.na(value) & is.na(value_numeric) & !replace ~ TRUE,
+        variable %in% c("patinfo_ageonset", "outcome_contacts_followed") & value_numeric < 0 ~ TRUE,
+        variable %in% c("patinfo_ageonset", "outcome_contacts_followed") & value_numeric > 110 ~ TRUE,
+        TRUE ~ FALSE
+      )
+    )
   
   ## check for non-missing values not converted to numeric
   if (any(dat_numeric$flag)) {
@@ -144,7 +150,7 @@ clean_linelist <- function(dat,
   ## assemble dictionary for date variables
   check_files <- list.files(
     path_corrections_dates,
-    pattern = "dates_check_compiled.*\\.xlsx",
+    pattern = "^dates_check_compiled.*\\.xlsx",
     full.names = TRUE
   )
   
@@ -244,7 +250,12 @@ clean_linelist <- function(dat,
   dat_dates_clean <- dat_date %>%
     select(-value, -flag_ambiguous) %>%
     tidyr::spread(variable, date) %>% 
-    left_join_replace(x = dat_numeric_clean, y = ., cols_match = c("db_row", "patient_id"))
+    left_join_replace(x = dat_numeric_clean, y = ., cols_match = c("db_row", "patient_id")) %>% 
+    # recalculate date diffs
+    mutate(
+      MSF_length_stay = as.numeric(outcome_date_of_outcome - MSF_date_consultation),
+      MSF_delay_before_admission = as.numeric(MSF_date_consultation - patcourse_dateonset)
+    )
   
   
   #### Clean categorical variables ---------------------------------------------
