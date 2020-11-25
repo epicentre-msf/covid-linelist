@@ -100,7 +100,15 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   ### clean names and join site metadata
   d_orig <- d_orig %>% 
     janitor::clean_names() %>%
-    dplyr::left_join(dict_facilities_join, by = "site")
+    dplyr::left_join(dict_facilities_join, by = "site") %>% 
+    mutate(
+      addresses_location_1_location_geographical_level_6 = case_when(
+        OC == "OCP" &
+          is.na(addresses_location_1_location_geographical_level_6) &
+          grepl("camp|community|union", addresses_location_1, ignore.case = TRUE) ~ addresses_location_1,
+        TRUE ~ addresses_location_1_location_geographical_level_6
+      )
+    )
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", NA))

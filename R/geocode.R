@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "COL"
+    country <- "BGD"
     write_checks <- TRUE
   }
   
@@ -48,6 +48,13 @@ clean_geo <- function(country,
                     remove = FALSE) %>% 
     select(all_of(col_order), matches("^adm[[:digit:]]_name")) %>% 
     mutate(across(all_of(adm_cols), ~ ifelse(.x == "", NA_character_, .x)))
+  
+  
+  # hack for BGD_Camp (fix in hmatch)
+  if (shape == "BGD_Camp") {
+    dat_geoclean_prep <- dat_geoclean_prep %>% 
+      mutate(adm1_name__res = if_else(adm1_name__res %in% c("Coxs Bazar", "Cox's Bazxar"), "Cox's Bazar", adm1_name__res))
+  }
   
   ## geo reference file
   georef_file <- file.path(
@@ -131,8 +138,6 @@ clean_geo <- function(country,
       warning("rows duplicated by hmatch::hmatch(), country ", country, call. = FALSE)
     }
     # update hmatch to handle when adm4 NA and level == 4
-    
-    
     
     ## write file for manual correction
     out_check <- df_match_best %>% 

@@ -74,6 +74,21 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   d_orig <- d_orig %>% 
     janitor::clean_names() %>%
     dplyr::left_join(dict_facilities_join, by = "site")
+  
+  if (!"addresses_location_1_location_geographical_level_6" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1_location_geographical_level_6 = NA_character_, .after = addresses_location_1_location_geographical_level_5)
+  }
+  
+  d_orig <- d_orig %>% 
+    mutate(
+      addresses_location_1_location_geographical_level_6 = case_when(
+        OC == "OCP" &
+          is.na(addresses_location_1_location_geographical_level_6) &
+          grepl("camp|community|union", addresses_location_1, ignore.case = TRUE) ~ addresses_location_1,
+        TRUE ~ addresses_location_1_location_geographical_level_6
+      )
+    )
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", NA))
@@ -113,7 +128,8 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     )) %>% 
     # derive MSF_admin_location_past_week
     mutate(across(addresses_location_1_location_geographical_level_3, ~ ifelse(is.na(.x), "", .x))) %>%
-    unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3) %>%
+    mutate(across(addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, ~ ifelse(is.na(.x), "", .x))) %>%
+    unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, sep = " | ") %>% 
     # MSF_job
     # hmatch(map_occupations) %>% ## 'occupation' column missing as of 2020-10-07
     # # MSF_symptom_aches
