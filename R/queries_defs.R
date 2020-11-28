@@ -21,6 +21,34 @@ queries_ident <- function(dat_raw, dat_clean) {
 }
 
 
+queries_numeric <- function(dat_raw) {
+  
+  queries <- list()
+  
+  # NUMER_01 Value not unambiguously coercible to numeric
+  vars_numeric <- c(
+    "patinfo_ageonset",
+    "MSF_delay_before_admission",
+    "MSF_length_stay",
+    "Comcond_present",
+    "outcome_contacts_followed"
+  )
+  queries[["NUMER_01"]] <- query(
+    dat_raw,
+    non_valid_number(.x),
+    cols_dotx = all_of(vars_numeric)
+  )
+  
+  # NUMER_02	Numeric variable that should be a positive number is less than zero	patinfo_ageonset, outcome_contacts_followed
+  queries[["NUMER_02"]] <- query(
+    dat_raw,
+    as_numeric_quiet(.x) < 0,
+    cols_dotx = c(patinfo_ageonset, outcome_contacts_followed)
+  )
+  
+  return(bind_query_list(queries))
+}
+
 
 queries_dates <- function(dat_raw, date_vars, dict_date_categories) {
   
@@ -280,8 +308,14 @@ queries_multi <- function(dat_raw, dat_clean) {
   queries[["MULTI_27"]] <- query(dat_clean, !is.na(MSF_refer_to) & !outcome_patcourse_status %in% "Transferred")
   
   # MULTI_28 Lab date/result specified but Tested over the course of the disease is 'No' or 'Unknown'
-  vars_lab <- c("Lab_date1", "outcome_lab_date", "outcome_lab_result")
-  queries[["MULTI_28"]] <- query(dat_clean, !is.na(.x) & MSF_outcome_tested %in% c("No", "Unknown"), cols_dotx = all_of(vars_lab))
+  vars_lab_date <- c("Lab_date1", "outcome_lab_date")
+  vars_lab_result <- c("MSF_test_results", "outcome_lab_result")
+  
+  queries[["MULTI_28"]] <- dplyr::bind_rows(
+    query(dat_clean, !is.na(.x) & MSF_outcome_tested %in% c("No", "Unknown"), cols_dotx = all_of(vars_lab_date)),
+    query(dat_clean, !.x %in% c(NA_character_, "Not done") & MSF_outcome_tested %in% c("No", "Unknown"), cols_dotx = all_of(vars_lab_result))
+  ) %>% 
+    arrange(site, linelist_row)
   
   # MULTI_29 Number of contact followed is specified but Number contacts unknown is 'Yes'
   queries[["MULTI_29"]] <- query(dat_clean, !is.na(outcome_contacts_followed) & outcome_contacts_followed_unknown == "Yes")

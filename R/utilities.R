@@ -1,4 +1,10 @@
 
+non_valid_number <- function(x) {
+  x_num <- as_numeric_quiet(x)
+  !is.na(x) & is.na(x_num)
+}
+
+
 string_std_lite <- function(x) {
   x <- toupper(x)
   x <- stringr::str_squish(x)
