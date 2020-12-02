@@ -5,6 +5,7 @@ source("R/import.R")
 source("R/clean.R")
 source("R/geocode.R")
 source("R/compare.R")
+source("R/indicators.R")
 
 
 ### Clean/compile country-specific linelists
@@ -121,14 +122,12 @@ ll_cleaned <- ll_import %>%
   )
 
 
-
 purrr::walk(
   sort(unique(ll_cleaned$country)),
   write_by_country,
   dat = ll_cleaned,
   path_prefix = file.path("local", "clean", "ll_covid_cleaned_")
 )
-
 
 
 ### Geocoding routines
@@ -140,13 +139,11 @@ ll_geocode <- purrr::map_dfr(
   write_checks = TRUE
 )
 
-
-
 # fetch_georef("VEN") %>%
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("AFG"))
+# View(fetch_georef("SOM"))
 
 
 # check again for missing values among important columns
@@ -187,10 +184,11 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
 
 
 # check for patient_id dropped since previous compilation
-llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>% 
+llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
   readRDS() %>% 
   anti_join(d_global, by = "patient_id") %>% 
   count(site)
+
 
 
 # double-check for allowed values
@@ -203,13 +201,12 @@ matchmaker::check_df(
 )
 
 
-
-
-
-
 ### Write global export
 if (FALSE) {
-  d_global_write <- dplyr::select(d_global, -starts_with("extra_"))
+  d_global_write <- d_global %>% 
+    dplyr::select(-starts_with("extra_")) %>% 
+    prepare_msf_dta()
+  
   path_out_global <- file.path(path_export_global, glue::glue("msf_covid19_linelist_global_{lubridate::today()}"))
   writexl::write_xlsx(d_global_write, paste0(path_out_global, ".xlsx"))
   saveRDS(d_global_write, paste0(path_out_global, ".rds"))
@@ -242,7 +239,6 @@ d_global_his <- d_global %>%
   filter(!patient_id %in% dup_id$value1)
 
 
-
 OC_list <- unique(d_global_his$OC)
 OC_list <- OC_list[!grepl("/", OC_list)]
 
@@ -266,6 +262,7 @@ if (FALSE) {
     llutils::write_simple_xlsx(d_oc_foc, path_out2_oc)
     
     # patient_id losses
+    ### update to compare across HIS exports, not HIS export to global (no rm of duplicates)
     df_oc_compare <- compare_ids(OC = OC_focal, path_export = path_export)
     path_out3_oc <- file.path(path_export, OC_focal, glue::glue("patient_id_losses_{tolower(OC_focal)}_{Sys.Date()}.xlsx"))
     llutils::write_simple_xlsx(df_oc_compare, file = path_out3_oc, group = compilation_date)
