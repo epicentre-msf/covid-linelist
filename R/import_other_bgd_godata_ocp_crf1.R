@@ -75,6 +75,19 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     janitor::clean_names() %>%
     dplyr::left_join(dict_facilities_join, by = "site")
   
+  
+  if (!"addresses_location_1" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1 = NA_character_, .before = addresses_location_1_location_geographical_level_1)
+  }
+  if (!"addresses_location_1_location_geographical_level_4" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1_location_geographical_level_4 = NA_character_, .after = addresses_location_1_location_geographical_level_3)
+  }
+  if (!"addresses_location_1_location_geographical_level_5" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1_location_geographical_level_5 = NA_character_, .after = addresses_location_1_location_geographical_level_4)
+  }
   if (!"addresses_location_1_location_geographical_level_6" %in% names(d_orig)) {
     d_orig <- d_orig %>% 
       mutate(addresses_location_1_location_geographical_level_6 = NA_character_, .after = addresses_location_1_location_geographical_level_5)
