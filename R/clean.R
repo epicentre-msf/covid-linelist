@@ -388,6 +388,7 @@ clean_linelist <- function(dat,
     mutate(
       patcourse_admit = case_when(
         MSF_visit_type %in% c("Admission to isolation center", "First hospitalisation", "First hospitalisation after a consultation", "Rehospitalisation") ~ "Yes",
+        MSF_visit_type %in% c("First consultation") ~ "No",
         TRUE ~ patcourse_admit
       ),
       patcourse_presHCF = case_when(
