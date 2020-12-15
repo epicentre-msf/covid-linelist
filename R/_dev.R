@@ -13,7 +13,7 @@ source("R/indicators.R")
 # geo-match, and write resulting cleaned linelist files
 
 # focal country ISO code
-countries_update <- sort(c(countries, "BEL", "PAK")) # update to include countries in linelist-other
+countries_update <- sort(c(countries, "BEL", "JOR", "PAK")) # update to include countries in linelist-other
 
 
 ### Import MSF Intersectional linelists
@@ -26,7 +26,6 @@ ll_import_epicentre <- purrr::map_dfr(
   dict_extra_vars = dict_extra_vars,
   site_exclude = "BGD_P_IPD" # switched to godata
 )
-
 
 
 ### MSF_N_Patient from OCA/BGD intersectional linelists, before they switched to GoData
@@ -42,6 +41,7 @@ source("R/import_other_cod_oca.R")
 source("R/import_other_hti_ocb.R")
 source("R/import_other_ind_ocb.R") # newest export requires new mapping template
 source("R/import_other_irq_ocb.R")
+source("R/import_other_jor_ocp.R")
 source("R/import_other_pak_ocb.R")
 source("R/import_other_yem_ocb_moh.R") # still using MoH version for now
 source("R/import_other_yem_ocp.R")
@@ -55,6 +55,7 @@ ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_ind_ocb <- import_other_ind_ocb(path_linelist_other, dict_linelist)
 ll_other_irq_ocb <- import_other_irq_ocb(path_linelist_other, dict_linelist)
+ll_other_jor_ocp <- import_other_jor_ocp(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # still using MoH version for now
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
@@ -72,6 +73,7 @@ ll_import <- dplyr::bind_rows(
   ll_other_hti_ocb,
   ll_other_ind_ocb,
   ll_other_irq_ocb,
+  ll_other_jor_ocp,
   ll_other_pak_ocb,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
@@ -143,7 +145,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("SOM"))
+# View(fetch_georef("JOR"))
 
 
 # check again for missing values among important columns
@@ -225,7 +227,6 @@ purrr::walk(
 ### Write OC-specific files
 queryr::query(d_global, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(country, OC), count = TRUE)
-
 
 d_global_his <- d_global %>% 
   mutate(across(all_of(date_vars), .fns = date_format)) %>% 

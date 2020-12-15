@@ -1,4 +1,15 @@
 
+merge_vars <- function(var1, var2) {
+  var1_std <- tolower(var1)
+  var2_std <- tolower(var2)
+  dplyr::case_when(
+    var1_std %in% "yes" | var2_std %in% "yes" ~ "Yes",
+    var1_std %in% "no" & var2_std %in% "no" ~ "No",
+    TRUE ~ "Unknown"
+  )
+}
+
+
 non_valid_number <- function(x) {
   x_num <- as_numeric_quiet(x)
   !is.na(x) & is.na(x_num)
@@ -126,7 +137,7 @@ map_columns <- function(data, vec_map) {
     data[[col_new]] <- data[[col_old]]
   }
   
-  data[,!names(data) %in% as.character(vec_map)]
+  data
 }
 
 
@@ -808,7 +819,7 @@ prep_query_number_int <- function(d, number_start) {
   
   out <- d %>% 
     group_by(site, query_group) %>% 
-    mutate(query_number_int = 1:n()) %>% 
+    mutate(query_number_int = seq_len(n())) %>% 
     ungroup()
   
   if (!missing(number_start)) {
