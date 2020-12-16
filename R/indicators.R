@@ -126,8 +126,8 @@ prepare_msf_dta <- function(dta) {
   ## Patients' care variables
   dta <- dta %>%
     mutate(
-      Comcond_count = rowSums(comcond_count_prep == "Yes", na.rm = TRUE),
-      Comcond_01 = ifelse(Comcond_count > 0, 1, 0)
+      ind_Comcond_count = rowSums(comcond_count_prep == "Yes", na.rm = TRUE),
+      ind_Comcond_01 = ifelse(ind_Comcond_count > 0, 1, 0)
     ) %>% 
     mutate(
       merge_admit = case_when(
