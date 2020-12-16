@@ -67,17 +67,17 @@ import_other_jor_ocp <- function(path_linelist_other, dict_linelist) {
   test_set_equal(d_orig$msf_symptom_joint_pain, c("yes", "no", NA))
   test_set_equal(d_orig$comcond_chronic_lung_disease, c("yes", "no", NA))
   test_set_equal(d_orig$comcond_asthma, c("yes", "no", NA))
-  test_set_equal(d_orig$msf_symptom_asymptomatic, c("yes", "no", "unknown", NA))
+  # test_set_equal(d_orig$msf_symptom_asymptomatic, c("yes", "no", "unknown", NA))
   
   ### Derived variables
   d_derive <- d_orig %>% 
     # MSF_symptom_aches, Comcond_lung, MSF_type_lung_disease
     mutate(
-      patcourse_asymp = case_when(
-        tolower(msf_symptom_asymptomatic) == "yes" ~ "No",
-        tolower(msf_symptom_asymptomatic) == "no" ~ "Yes",
-        TRUE ~ msf_symptom_asymptomatic
-      ),
+      # patcourse_asymp = case_when(
+      #   tolower(msf_symptom_asymptomatic) == "yes" ~ "No",
+      #   tolower(msf_symptom_asymptomatic) == "no" ~ "Yes",
+      #   TRUE ~ msf_symptom_asymptomatic
+      # ),
       MSF_symptom_aches = merge_vars(msf_symptom_muscle_aches, msf_symptom_joint_pain),
       Comcond_lung = merge_vars(comcond_chronic_lung_disease, comcond_asthma),
       MSF_type_lung_disease = if_else(tolower(comcond_asthma) == "yes", "Asthma", NA_character_)
