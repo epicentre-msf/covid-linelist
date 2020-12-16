@@ -274,13 +274,62 @@ get_site_meta <- function(file_path) {
     
     language <- names(which.max(language_counts))
     version <- "Other"
+    linelist_type <- NA_character_
+    nb_variables <- NA_character_
+    center_admission <- NA_character_
+    center_consultation <- NA_character_
+    center_screening <- NA_character_
+    center_ICU <- NA_character_
     
   } else {
     language <- df$value[df$variable == "language"]
     version <- df$value[df$variable == "version"]
+    linelist_type <- get_meta_val("linelist_type", df$variable, df$value)
+    nb_variables <- get_meta_val("nb_variables", df$variable, df$value)
+    center_admission <- get_meta_val("center_admission", df$variable, df$value)
+    center_consultation <- get_meta_val("center_consultation", df$variable, df$value)
+    center_screening <- get_meta_val("center_screening", df$variable, df$value)
+    center_ICU <- get_meta_val("center_ICU", df$variable, df$value)
   }
   
-  return(tibble::tibble(linelist_lang = language, linelist_vers = version))
+  df_cd <- try(
+    readxl::read_xlsx(
+      file_path,
+      sheet = "Case_definitions",
+      col_types = "text"
+    ),
+    silent = TRUE
+  )
+  
+  if ("try-error" %in% class(df_cd)) {
+    
+    # if no Case_definitions sheet
+    case_definition <- NA_character_
+    case_definition_country <- NA_character_
+  } else {
+    case_definition <- df_cd$case_definition[1]
+    case_definition_country <- df_cd$case_definition_country[1]
+  }
+  
+  return(tibble::tibble(linelist_lang = language,
+                        linelist_vers = version,
+                        linelist_type = linelist_type,
+                        nb_variables = nb_variables,
+                        center_admission = center_admission,
+                        center_consultation = center_consultation,
+                        center_screening = center_screening,
+                        center_ICU = center_ICU,
+                        case_definition = case_definition,
+                        case_definition_country = case_definition_country))
+}
+
+
+get_meta_val <- function(var, var_vec, val_vec) {
+  if (var %in% var_vec) {
+    val_vec[var_vec == var]
+  } else {
+    NA_character_
+  }
 }
 
 
