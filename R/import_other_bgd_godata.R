@@ -112,7 +112,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", NA))
-  test_set_equal(d_orig$msf_specific_outcome, c("other", "transferred", "sent back home", "lama", NA))
+  test_set_equal(d_orig$msf_specific_outcome, c("other", "transferred", "sent back home", "lama", "admitted", NA))
   test_set_equal(d_orig$complications, c("Currently_on_treatment", NA))
   
 
@@ -136,43 +136,53 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   
   d_derive <- d_orig %>% 
     # patinfo_ageonset (if both ages 0, should be NA?)
-    mutate(patinfo_ageonset = case_when(
-      age_age_years == "0" & age_age_months == "0" ~ NA_character_,
-      age_age_months == "0" ~ age_age_years,
-      age_age_years == "0" ~ age_age_months
-    )) %>% 
-    mutate(patinfo_ageonsetunit = case_when(
-      age_age_years == "0" & age_age_months == "0" ~ NA_character_,
-      age_age_months == "0" ~ "Year",
-      age_age_years == "0" ~ "Month"
-    )) %>% 
+    mutate(
+      patinfo_ageonset = case_when(
+        age_age_years == "0" & age_age_months == "0" ~ NA_character_,
+        age_age_months == "0" ~ age_age_years,
+        age_age_years == "0" ~ age_age_months
+      )
+    ) %>% 
+    mutate(
+      patinfo_ageonsetunit = case_when(
+        age_age_years == "0" & age_age_months == "0" ~ NA_character_,
+        age_age_months == "0" ~ "Year",
+        age_age_years == "0" ~ "Month"
+      )
+    ) %>% 
     # derive MSF_admin_location_past_week
     mutate(across(addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, ~ ifelse(is.na(.x), "", .x))) %>%
     unite("MSF_admin_location_past_week", addresses_location_1_location_geographical_level_3:addresses_location_1_location_geographical_level_6, sep = " | ") %>% 
     # MSF_job
     hmatch(map_occupations) %>% 
     # MSF_symptom_aches
-    mutate(MSF_symptom_aches = case_when(
-      muscle_ache %in% "Yes" | joint_ache %in% "Yes" ~ "Yes",
-      muscle_ache %in% "No" | joint_ache %in% "No" ~ "No",
-      is.na(muscle_ache) & is.na(joint_ache) ~ NA_character_,
-      TRUE ~ "Unknown"
-    )) %>% 
+    mutate(
+      MSF_symptom_aches = case_when(
+        muscle_ache %in% "Yes" | joint_ache %in% "Yes" ~ "Yes",
+        muscle_ache %in% "No" | joint_ache %in% "No" ~ "No",
+        is.na(muscle_ache) & is.na(joint_ache) ~ NA_character_,
+        TRUE ~ "Unknown"
+      )
+    ) %>% 
     # Comcond_immuno
-    mutate(Comcond_immuno = case_when(
-      hiv_immunodeficiency %in% "Yes" | other_immunosup_disorder %in% "Yes" ~ "Yes",
-      hiv_immunodeficiency %in% "No" | other_immunosup_disorder %in% "No" ~ "No",
-      is.na(hiv_immunodeficiency) & is.na(other_immunosup_disorder) ~ NA_character_,
-      TRUE ~ "Unknown"
-    )) %>% 
+    mutate(
+      Comcond_immuno = case_when(
+        hiv_immunodeficiency %in% "Yes" | other_immunosup_disorder %in% "Yes" ~ "Yes",
+        hiv_immunodeficiency %in% "No" | other_immunosup_disorder %in% "No" ~ "No",
+        is.na(hiv_immunodeficiency) & is.na(other_immunosup_disorder) ~ NA_character_,
+        TRUE ~ "Unknown"
+      )
+    ) %>% 
     # MSF_tb_active
-    mutate(MSF_tb_active = case_when(
-      tuberculosis %in% "Yes" | on_treatment %in% "Currently_on_treatment" ~ "Yes (currently on treatment)",
-      tuberculosis %in% "Yes" & !on_treatment %in% "Currently_on_treatment" ~ "Yes (unknown)",
-      tuberculosis %in% "No" ~ "No",
-      tuberculosis %in% "Unknown" ~ "Unknown",
-      tuberculosis %in% NA_character_ ~ NA_character_
-    )) %>% 
+    mutate(
+      MSF_tb_active = case_when(
+        tuberculosis %in% "Yes" | on_treatment %in% "Currently_on_treatment" ~ "Yes (currently on treatment)",
+        tuberculosis %in% "Yes" & !on_treatment %in% "Currently_on_treatment" ~ "Yes (unknown)",
+        tuberculosis %in% "No" ~ "No",
+        tuberculosis %in% "Unknown" ~ "Unknown",
+        tuberculosis %in% NA_character_ ~ NA_character_
+      )
+    ) %>% 
     # MSF_complications and MSF_other_complications
     mutate(
       l_complicat = purrr::pmap(
@@ -188,27 +198,33 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
       MSF_other_complications = map_chr(l_complicat, extract_other_comp)
     ) %>% 
     # outcome_asymp
-    mutate(outcome_asymp = case_when(
-      patient_asymptomatic == "Yes" ~ "No",
-      patient_asymptomatic == "No" ~ "Yes",
-      TRUE ~ patient_asymptomatic
-    )) %>% 
+    mutate(
+      outcome_asymp = case_when(
+        patient_asymptomatic == "Yes" ~ "No",
+        patient_asymptomatic == "No" ~ "Yes",
+        TRUE ~ patient_asymptomatic
+      )
+    ) %>% 
     # outcome_patcourse_presHCF
     mutate(outcome_patcourse_presHCF = latest_adm_date) %>% 
     # outcome_patcourse_status
-    mutate(outcome_patcourse_status = case_when(
-      outcome == "Deceased" ~ "Died",
-      outcome == "Recovered" ~ "Cured",
-      is.na(msf_specific_outcome) & !outcome %in% c("Deceased", "Recovered") ~ "Other",
-      msf_specific_outcome == "Lama" ~ "Left against medical advice",
-      TRUE ~ msf_specific_outcome
-    )) %>% 
+    mutate(
+      outcome_patcourse_status = case_when(
+        outcome == "Deceased" ~ "Died",
+        outcome == "Recovered" ~ "Cured",
+        is.na(msf_specific_outcome) & !outcome %in% c("Deceased", "Recovered") ~ "Other",
+        tolower(msf_specific_outcome) == "lama" ~ "Left against medical advice",
+        tolower(msf_specific_outcome) == "admitted" ~ "Other",
+        TRUE ~ msf_specific_outcome
+      )
+    ) %>% 
     # outcome_patcourse_status_other
-    mutate(outcome_other_prep = map2_chr(outcome, please_specify_other_outcome, collapse_unique, to_chr = TRUE),
-           outcome_patcourse_status_other = case_when(
-             outcome_patcourse_status == "Other" & outcome %in% c("Healthy", "Not recovered") ~ outcome_other_prep,
-             outcome_patcourse_status == "Other" ~ please_specify_other_outcome
-           )
+    mutate(
+      outcome_other_prep = map2_chr(outcome, please_specify_other_outcome, collapse_unique, to_chr = TRUE),
+      outcome_patcourse_status_other = case_when(
+        outcome_patcourse_status == "Other" & outcome %in% c("Healthy", "Not recovered") ~ outcome_other_prep,
+        outcome_patcourse_status == "Other" ~ please_specify_other_outcome
+      )
     ) %>% 
     # outcome_date_of_outcome
     mutate(outcome_date_of_outcome = latest_end_date) %>% 
