@@ -5,6 +5,7 @@ merge_vars <- function(var1, var2) {
   dplyr::case_when(
     var1_std %in% "yes" | var2_std %in% "yes" ~ "Yes",
     var1_std %in% "no" & var2_std %in% "no" ~ "No",
+    is.na(var1_std) & is.na(var2_std) ~ NA_character_,
     TRUE ~ "Unknown"
   )
 }

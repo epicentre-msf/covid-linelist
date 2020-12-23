@@ -63,10 +63,10 @@ import_other_jor_ocp <- function(path_linelist_other, dict_linelist) {
     left_join(dict_facilities, by = "site")
   
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$msf_symptom_muscle_aches, c("yes", "no", NA))
-  test_set_equal(d_orig$msf_symptom_joint_pain, c("yes", "no", NA))
-  test_set_equal(d_orig$comcond_chronic_lung_disease, c("yes", "no", NA))
-  test_set_equal(d_orig$comcond_asthma, c("yes", "no", NA))
+  test_set_equal(d_orig$msf_symptom_muscle_aches, c("yes", "no", "unknown", NA))
+  test_set_equal(d_orig$msf_symptom_joint_pain, c("yes", "no", "unknown", NA))
+  test_set_equal(d_orig$comcond_chronic_lung_disease, c("yes", "no", "unknown", NA))
+  test_set_equal(d_orig$comcond_asthma, c("yes", "no", "unknown", NA))
   # test_set_equal(d_orig$msf_symptom_asymptomatic, c("yes", "no", "unknown", NA))
   
   ### Derived variables
