@@ -26,7 +26,6 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     site_name = c("Herat Regional Hospital MSF COVID-19 Triage", "MSF IDP Clinic")
   )
   
-  
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$msf_facitity, c("hrh", "idp"))
   test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", "unknown", "non recorded", NA))
@@ -97,7 +96,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     )) %>% 
     # derive MSF_refer_to
     mutate(
-      MSF_refer_to = ifelse(referral == "Other:", if_other_61, referral),
+      MSF_refer_to = ifelse(referral == "Other:", if_other_63, referral),
       MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
     )
 
