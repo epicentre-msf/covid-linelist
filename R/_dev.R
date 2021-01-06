@@ -13,7 +13,8 @@ source("R/indicators.R")
 # geo-match, and write resulting cleaned linelist files
 
 # focal country ISO code
-countries_update <- sort(c(countries, "BEL", "JOR", "PAK")) # update to include countries in linelist-other
+# (update to include countries in linelist-other)
+countries_update <- sort(unique(c(countries, "BEL")))
 
 
 ### Import MSF Intersectional linelists
@@ -38,6 +39,7 @@ id_oca_bgd_intersect <- ll_import_epicentre %>%
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
 source("R/import_other_cod_oca.R")
+source("R/import_other_cod_ocp.R")
 source("R/import_other_hti_ocb.R")
 source("R/import_other_ind_ocb.R") # newest export requires new mapping template
 source("R/import_other_irq_ocb.R")
@@ -52,6 +54,7 @@ source("R/import_other_bgd_godata_ocp_crf1.R")
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 # ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist) # new export to data-raw/COD seems to overlap and supersede
+ll_other_cod_ocp <- import_other_cod_ocp(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_ind_ocb <- import_other_ind_ocb(path_linelist_other, dict_linelist)
 ll_other_irq_ocb <- import_other_irq_ocb(path_linelist_other, dict_linelist)
@@ -63,13 +66,13 @@ ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
 ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
 
-
 ### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
   ll_other_afg_tri,
   ll_other_bel_ocb,
   # ll_other_cod_oca,
+  ll_other_cod_ocp,
   ll_other_hti_ocb,
   ll_other_ind_ocb,
   ll_other_irq_ocb,
@@ -145,7 +148,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("JOR"))
+# View(fetch_georef("PAK"))
 
 
 # check again for missing values among important columns
@@ -153,7 +156,7 @@ queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
-
+queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
 
 purrr::walk(
   countries_update,
