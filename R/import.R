@@ -139,7 +139,7 @@ scan_sheets <- function(path_data_raw,
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
-    mutate(path_parse = gsub("lon_.+_(?=2020)", "0000__", path_parse, perl = TRUE)) %>% 
+    mutate(path_parse = gsub("lon_.+_(?=202[0123])", "0000__", path_parse, perl = TRUE)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{2}") %>% 
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
     mutate(site_name_join = format_text2(site_name)) %>% 
