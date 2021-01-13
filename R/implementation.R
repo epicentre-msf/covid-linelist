@@ -114,19 +114,15 @@ out <- dict_facilities %>%
   mutate(across(where(is.Date), as.character)) %>% 
   select(
     country, OC, project, site_name, site_code = site, site_type, version, type,
-    starts_with("center_"), language,
+    facility_triage = center_screening,
+    facility_OPD = center_consultation,
+    facility_IPD = center_admission,
+    facility_ICU = center_ICU,
+    language,
     first_upload, latest_upload, geobase_available,
     visits, starts_with("prop"),
     comment, starts_with("case_def")
-  ) %>% 
-  rename(
-    type_admit = center_admission,
-    type_consult = center_consultation,
-    type_screen = center_screening,
-    type_ICU = center_ICU
   )
-
-
 
 ### Date of most recent Sunday (flag if latest upload before)
 cutoff_date <- floor_date(today(), "week")
@@ -142,6 +138,7 @@ red_fg <- createStyle(fgFill = "#FFC7CE")
 
 i_no_recent_export <- which(out$latest_upload < cutoff_date) + 1L
 addStyle(wb, 1, cols = 15, rows = i_no_recent_export, style = red_fg, stack = TRUE)
+addStyle(wb, 1, cols = seq_len(ncol(out)), rows = 1, style = createStyle(halign = "left"), stack = TRUE)
 addFilter(wb, 1, rows = 1, cols = seq_len(ncol(out)))
 
 conditionalFormatting(wb, 1, cols = 16, rows = 1:nrow(out), type = "contains", rule = "No", style = red_bg)
