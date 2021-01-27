@@ -1,7 +1,7 @@
 
 ### Required libraries
 library(tidyverse)
-library(readxl)
+library(qxl)
 library(here)
 library(glue)
 library(lubridate)
@@ -125,31 +125,30 @@ out <- dict_facilities %>%
   )
 
 ### Date of most recent Sunday (flag if latest upload before)
-cutoff_date <- floor_date(today(), "week")
+(cutoff_date <- floor_date(today(), "week"))
 
 
-## Write
-library(openxlsx)
-
-wb <- llutils::write_simple_xlsx(out)
-
-red_bg <- createStyle(bgFill = "#FFC7CE")
-red_fg <- createStyle(fgFill = "#FFC7CE")
-
-i_no_recent_export <- which(out$latest_upload < cutoff_date) + 1L
-addStyle(wb, 1, cols = 15, rows = i_no_recent_export, style = red_fg, stack = TRUE)
-addStyle(wb, 1, cols = seq_len(ncol(out)), rows = 1, style = createStyle(halign = "left"), stack = TRUE)
-addFilter(wb, 1, rows = 1, cols = seq_len(ncol(out)))
-
-conditionalFormatting(wb, 1, cols = 16, rows = 1:nrow(out), type = "contains", rule = "No", style = red_bg)
-conditionalFormatting(wb, 1, cols = 18, rows = 1:nrow(out), rule = "<0.50", style = red_bg)
-conditionalFormatting(wb, 1, cols = 19, rows = 1:nrow(out), rule = "<0.50", style = red_bg)
-conditionalFormatting(wb, 1, cols = 20, rows = 1:nrow(out), rule = "<0.50", style = red_bg)
+### Write
+library(qxl)
 
 file_out <- file.path(
   path_implementation,
   sprintf("site_implementation_summary_%s.xlsx", lubridate::today())
 )
 
-openxlsx::saveWorkbook(wb, file = file_out, overwrite = TRUE)
+qxl::qxl(
+  out,
+  file = file_out,
+  style1 = qstyle(
+    rows = .x < 0.5,
+    cols = starts_with("prop_adm"),
+    bgFill = "#FFC7CE"
+  ),
+  style2 = qstyle(
+    rows = as.Date(latest_upload) < as.Date("2021-01-24"), # swap in cutoff_date
+    cols = latest_upload,
+    bgFill = "#FFC7CE"
+  ),
+  filter = TRUE
+)
 
