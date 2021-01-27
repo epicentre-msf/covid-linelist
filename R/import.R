@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "AFG"
+    country <- "SDN"
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -119,8 +119,8 @@ scan_sheets <- function(path_data_raw,
   )
   
   # regex patterns to remove from file path prior to parsing
-  reg_rm <- "^linelist_Covid_anonymous__|_[[:digit:]]{2}-[[:digit:]]{2}\\.xlsx"
-
+  reg_rm <- "^linelist_Covid_anonymous__|_\\d{2}-\\d{2}\\.xlsx$|\\.xlsx$"
+  
   # variables to parse from file path
   vars_parse <- c("country",
                   "OC",
@@ -135,7 +135,7 @@ scan_sheets <- function(path_data_raw,
     mutate_all(as.character) %>% 
     mutate(site_name_join = format_text2(site_filename)) %>% 
     select(site, country, shape, OC, project, site_name, uid,  site_name_join)
-
+  
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
