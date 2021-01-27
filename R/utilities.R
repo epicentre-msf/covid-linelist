@@ -207,10 +207,9 @@ parse_excel_dates <- function(x) {
 }
 
 
-parse_other_dates <- function(x, order = c("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d")) {
+parse_other_dates <- function(x, order = c("Ymd", "dmY", "dmy", "mdY", "Ymd HMS")) {
   x <- as.character(x)
-  i <- grepl("\\/", x)
-  x[i] <- as.character(lubridate::parse_date_time(x[i], order = order))
+  x <- as.character(lubridate::parse_date_time(x, order = order))
   x
 }
 
@@ -221,6 +220,7 @@ parse_dates <- function(x) {
   x <- parse_other_dates(x)
   suppressWarnings(lubridate::as_date(x))
 }
+
 
 non_valid_date <- function(x) {
   x_date <- parse_dates(x)
