@@ -65,7 +65,10 @@ queries_dates <- function(dat_raw, date_vars, dict_date_categories) {
   queries <- list()
   
   # DATES_01 Date value not unambiguously coercible to YYYY-MM-DD
-  queries[["DATES_01"]] <- query(dates_raw, non_valid_date(.x), cols_dotx = all_of(vars_check))
+  queries[["DATES_01"]] <- query(dates_raw, non_valid_date(.x), cols_dotx = all_of(vars_check)) %>% 
+    filter(!(variable1 %in% c("MSF_date_consultation", "outcome_patcourse_presHCF", "patcourse_presHCF") & tolower(value1) %in% "not admitted")) %>% 
+    filter(!(variable1 %in% c("Lab_date1", "outcome_lab_date") & tolower(value1) %in% "not done")) %>% 
+    filter(!tolower(value1) %in% c("unknown", "desconhecido", "don't remember"))
   
   # DATES_02 Date in future (relative to upload date)
   queries[["DATES_02"]] <- query(dates_parse, .x > as.Date(upload_date), cols_dotx = all_of(vars_check))
@@ -249,7 +252,8 @@ queries_multi <- function(dat_raw, dat_clean) {
   
   # MULTI_11 Hospital-related variable (oxygen, ICU, ventilated, and/or ECMO) is 'Yes' but Type of visit does not correspond to "Hospitalization"
   # don't flag if MSF_visit_type = <NA> because separate query for that (OTHER_01)
-  vars_hosp <- c("MSF_received_oxygen", "patcourse_icu", "patcourse_vent", "patcourse_ecmo")
+  vars_hosp <- c("MSF_received_oxygen", "patcourse_icu", "patcourse_vent")
+  # vars_hosp <- c("MSF_received_oxygen", "patcourse_icu", "patcourse_vent", "patcourse_ecmo")
   queries[["MULTI_11"]] <- query(dat_clean, .x == "Yes" & MSF_visit_type %in% "First consultation", cols_dotx = all_of(vars_hosp))
   
   # MULTI_12 Date of isolation is given but Case isolated is not "Yes"
@@ -277,7 +281,7 @@ queries_multi <- function(dat_raw, dat_clean) {
   # MULTI_18 Outcome date of symptom onset is specified but Outcome asymptomatic is not 'No'
   
   # MULTI_19 Visit type corresponds to 'Hospitalization' but Outcome admission to hospital is not 'Yes'
-  queries[["MULTI_19"]] <- query(dat_clean, patcourse_admit == "Yes" & !outcome_patcourse_admit %in% "Yes")
+  queries[["MULTI_19"]] <- query(dat_clean, patcourse_admit == "Yes" & !outcome_patcourse_admit %in% c("Yes", NA))
   
   # MULTI_20 Outcome date of admission specified but Outcome admission to hospital is not 'Yes'
   # queries[["MULTI_20"]] <- query(dat_clean, !is.na(outcome_patcourse_presHCF) & !outcome_patcourse_admit %in% "Yes")
@@ -287,16 +291,16 @@ queries_multi <- function(dat_raw, dat_clean) {
   # anti_join(M20, M19) # all MULTI_20 already picked up by MULTI_19
   
   # MULTI_21 Received oxygen at admission is 'Yes' but Outcome received oxyen is not 'Yes'
-  queries[["MULTI_21"]] <- query(dat_clean, MSF_received_oxygen == "Yes" & !MSF_outcome_received_oxygen %in% "Yes")
+  queries[["MULTI_21"]] <- query(dat_clean, MSF_received_oxygen == "Yes" & !MSF_outcome_received_oxygen %in% c("Yes", NA))
   
   # MULTI_22 Admitted to ICU at admission is 'Yes' but Outcome ICU is not 'Yes'
-  queries[["MULTI_22"]] <- query(dat_clean, patcourse_icu == "Yes" & !outcome_patcourse_icu %in% "Yes")
+  queries[["MULTI_22"]] <- query(dat_clean, patcourse_icu == "Yes" & !outcome_patcourse_icu %in% c("Yes", NA))
   
   # MULTI_23 Ventilated at admission is 'Yes' but Outcome ventilated is not 'Yes'
-  queries[["MULTI_23"]] <- query(dat_clean, patcourse_vent == "Yes" & !outcome_patcourse_vent %in% "Yes")
+  queries[["MULTI_23"]] <- query(dat_clean, patcourse_vent == "Yes" & !outcome_patcourse_vent %in% c("Yes", NA))
   
   # MULTI_24 Received ECMO at admission is 'Yes' but Outcome ECMO is not 'Yes'
-  queries[["MULTI_24"]] <- query(dat_clean, patcourse_ecmo == "Yes" & !outcome_patcourse_ecmo %in% "Yes")
+  # queries[["MULTI_24"]] <- query(dat_clean, patcourse_ecmo == "Yes" & !outcome_patcourse_ecmo %in% "Yes")
   
   # MULTI_25 Other patient outcome status is specified but Patient outcome status is not 'Other'
   queries[["MULTI_25"]] <- query(dat_clean, !is.na(outcome_patcourse_status_other) & is.na(outcome_patcourse_status))
@@ -435,7 +439,7 @@ queries_other <- function(dat_raw, dat_clean) {
   queries[["OTHER_01"]] <- query(dat_clean, is.na(.x), cols_dotx = all_of(vars_essential))
   
   # OTHER_02 ECMO variable is "Yes" (to be checked by field)
-  queries[["OTHER_02"]] <- query(dat_clean, patcourse_ecmo %in% "Yes" | outcome_patcourse_ecmo %in% "Yes")
+  # queries[["OTHER_02"]] <- query(dat_clean, patcourse_ecmo %in% "Yes" | outcome_patcourse_ecmo %in% "Yes")
   
   # OTHER_03 Essential variable Date symptom onset is missing (only applies if Asymptomatic is not "Yes")
   queries[["OTHER_03"]] <- query(dat_clean, !patcourse_asymp %in% c("Yes", "Unknown") & is.na(patcourse_dateonset))
