@@ -40,6 +40,7 @@ dat_clean <- llutils::list_files(
 ### Run all queries
 df_queries <- dplyr::bind_rows(
   queries_ident(dat_raw, dat_clean),
+  queries_numeric(dat_raw),
   queries_dates(dat_raw, date_vars, dict_date_categories),
   queries_categorical(dat_raw, dict_factors, dict_countries, categ_query_exclude, dict_countries_correct),
   queries_multi(dat_raw, dat_clean),
@@ -55,12 +56,18 @@ df_queries_join <- df_queries %>%
 
 
 # df_queries %>%
+#   filter(query_id == 'DATES_01') %>%
+#   count(variable1, value1, sort = TRUE) %>%
+#   print(n = 30)
+
+# df_queries %>%
 #   count(query_id, sort = T) %>%
 #   left_join(query_defs)
 # 
 # df_queries %>%
 #   filter(query_id == "CATEG_01") %>%
-#   count(variable1, value1, sort = TRUE)
+#   count(variable1, value1, sort = TRUE) %>% 
+#   print(n = 20)
 # 
 # df_queries %>%
 #   count(site, sort = TRUE)
@@ -87,28 +94,13 @@ queries_written_site <- purrr::map_dfr(
   read_query_trackers
 ) %>% 
   rename(!!query_recode_inv) %>% 
-  select(-i) %>% 
   mutate(
     site = if_else(site == "PAK_A_TIM", "PAK_B_TIM", site),
-    site = if_else(site == "PAK_A_TIM", "PAK_B_TIM", site)
+    site = if_else(site == "PAK_A_TIM", "PAK_B_TIM", site),
+    across(c(linelist_row), as.integer),
+    date_resolved_field = as.character(parse_dates(date_resolved_field))
   ) %>% 
-  mutate(across(c(linelist_row), as.integer)) %>% 
-  select(-any_of(c("exclude")), -any_of(paste0("variable", 4:9)), -any_of(paste0("value", 4:9))) %>% 
-  # relocate(c(variable3, value3), .after = "value2") %>% 
-  # mutate(resolved_field = dplyr::if_else(!is.na(date_resolved_field), "Resolved", resolved_field)) %>% 
-  mutate(date_resolved_field = as.character(parse_dates(date_resolved_field)))
-
-
-# tracker_files <- llutils::list_files(
-#   path_queries, pattern = "query_tracker",
-#   full.names = TRUE,
-#   select = "latest"
-# )
-# 
-# queries_written <- map_dfr(tracker_files, read_query_trackers) %>%
-#   rename(!!query_recode_inv) %>%
-#   select(-i) %>%
-#   mutate(across(c(linelist_row), as.integer))
+  select(-any_of(c("exclude", "i")), -any_of(paste0("variable", 4:9)), -any_of(paste0("value", 4:9)))
 
 queries_written_groups <- queries_written_site %>% 
   select(query_group, query_id, site, MSF_N_Patient, linelist_row) %>% 
@@ -140,10 +132,6 @@ queries_new <- df_queries %>%
 # 
 # queries_new %>%
 #   count(site, description, sort = TRUE)
-# 
-# queries_new %>%
-#   filter(site == "PAK_B_TIM", query_id == "CATEG_01") %>%
-#   count(variable1, value1, sort = TRUE)
 
 queries_new_no_group <- queries_new %>% 
   filter(is.na(query_group)) %>% 
