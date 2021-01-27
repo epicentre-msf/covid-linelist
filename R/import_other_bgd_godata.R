@@ -111,13 +111,14 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
     )
 
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", NA))
-  test_set_equal(d_orig$msf_specific_outcome, c("other", "transferred", "sent back home", "lama", "admitted", NA))
-  test_set_equal(d_orig$complications, c("Currently_on_treatment", NA))
+  test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", "Currently no treatment", NA))
+  test_set_equal(
+    d_orig$msf_specific_outcome,
+    c("other", "transferred", "sent back home", "lama", "admitted", "others", "ktp", "quarrentine", NA)
+  )
   
 
   ### Derived variables
-  
   ## same as date_of_current_visit?
   latest_adm_date <- d_orig %>% 
     select(starts_with("dates_start_date_")) %>% # can be more than 1
@@ -177,6 +178,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
     mutate(
       MSF_tb_active = case_when(
         tuberculosis %in% "Yes" | on_treatment %in% "Currently_on_treatment" ~ "Yes (currently on treatment)",
+        tuberculosis %in% "Yes" | on_treatment %in% "Currently no treatment" ~ "Yes (currently no treatment)",
         tuberculosis %in% "Yes" & !on_treatment %in% "Currently_on_treatment" ~ "Yes (unknown)",
         tuberculosis %in% "No" ~ "No",
         tuberculosis %in% "Unknown" ~ "Unknown",
@@ -214,7 +216,8 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
         outcome == "Recovered" ~ "Cured",
         is.na(msf_specific_outcome) & !outcome %in% c("Deceased", "Recovered") ~ "Other",
         tolower(msf_specific_outcome) == "lama" ~ "Left against medical advice",
-        tolower(msf_specific_outcome) == "admitted" ~ "Other",
+        tolower(msf_specific_outcome) %in% "admitted" ~ "Other",
+        tolower(msf_specific_outcome) %in% c("others", "quarrentine", "ktp") ~ "Other", # ???
         TRUE ~ msf_specific_outcome
       )
     ) %>% 
