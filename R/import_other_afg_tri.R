@@ -9,14 +9,31 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   source("R/import_other_afg_tri.R")
   
   ### Read linelist
-  file_ll <- llutils::list_files(
+  
+  # last file before switch to new 2021 file
+  file_ll_2020 <- llutils::list_files(
+    path = file.path(path_linelist_other, "OCP", "AFG"),
+    pattern = "2021_01_17.*\\.xlsx",
+    full.names = TRUE,
+    select = "latest"
+  )
+  
+  d_orig_old <- import_afg_tri_helper(file_ll_2020, skip = 1) %>% 
+    rename(if_other = if_other_63) %>%  # rename to match 2021-01-26+ files
+    mutate(date = parse_dates(gregorian_date)) %>% 
+    filter(date < as.Date("2021-01-04")) %>%  # 2021-01-04+ in newer file
+    select(-date)
+  
+  # latest file 2021+
+  file_ll_latest <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "\\.xlsx",
     full.names = TRUE,
     select = "latest"
   )
   
-  d_orig <- import_afg_tri_helper(file_ll)
+  d_orig <- import_afg_tri_helper(file_ll_latest) %>% 
+    bind_rows(d_orig_old)
   
   site_meta <- data.frame(
     msf_facitity = c("hrh", "idp"),
@@ -37,7 +54,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   test_set_equal(d_orig$sent_for_testing, c("yes", "no", NA))
   test_set_equal(d_orig$other_immunodeficiency, c("yes", "no","unknown",  NA))
   test_set_equal(d_orig$malignancy_cancer, c("yes", "no", "unknown", NA))
-
+  
   ### Constants and derived variables
   d_derived <- d_orig %>% 
     # site metadata
@@ -96,10 +113,10 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     )) %>% 
     # derive MSF_refer_to
     mutate(
-      MSF_refer_to = ifelse(referral == "Other:", if_other_63, referral),
+      MSF_refer_to = ifelse(referral == "Other:", if_other, referral),
       MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
     )
-
+  
   # d_derived %>%
   #   count(Comcond_immuno, hiv_status, other_immunodeficiency, malignancy_cancer) %>% 
   #   print(n = "all")
@@ -237,17 +254,22 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
  
 
 
-import_afg_tri_helper <- function(path, site) {
+import_afg_tri_helper <- function(path, site, skip = 0) {
   
   upload_date <- as.Date(
     stringr::str_extract(path, "[0-9]{4}_[0-9]{2}_[0-9]{2}"),
     format = "%Y_%m_%d"
   )
   
+  # account for variation in sheet names
+  sheets <- readxl::excel_sheets(path)
+  sheet_data <- grep("data", sheets, ignore.case = TRUE, value = TRUE)
+  
   readxl::read_xlsx(
     path, 
-    sheet = " data",
-    skip = 1, col_types = "text",
+    sheet = sheet_data,
+    skip = skip,
+    col_types = "text",
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>% 
     janitor::clean_names() %>% 
