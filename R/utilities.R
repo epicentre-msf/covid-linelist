@@ -25,6 +25,15 @@ string_std_lite <- function(x) {
 }
 
 
+string_std_simple <- function(x) {
+  x <- tolower(x)
+  x <- gsub("^[[:punct:]|[:space:]]+|[[:punct:]|[:space:]]+$", "", x)
+  x <- gsub("[[:punct:]|[:space:]]+", "_", x)
+  x <- stringi::stri_trans_general(x, id = "Latin-ASCII")
+  x
+}
+
+
 collapse_name <- function(..., collapse = "; ") {
   m <- cbind(...)
   apply(m, 1, collapse_name_, collapse = collapse)

@@ -259,21 +259,21 @@ clean_linelist <- function(dat,
   
   
   #### Clean categorical variables ---------------------------------------------
-  
   dict_factors_long <- dict_factors %>% 
     mutate(english = values_en) %>% 
     pivot_longer(cols = starts_with("values"), names_to = "language") %>% 
     mutate(language = stringr::str_sub(language, -2)) %>% 
     arrange(language) %>% 
-    mutate(value_std = hmatch::string_std(value)) %>% 
+    mutate(value_std = string_std_simple(value)) %>% 
     select(value_std, value, variable, english, language)
   
   dat_factors_clean <- dat_dates_clean %>% 
     mutate(language = tolower(stringr::str_sub(linelist_lang, 1, 2))) %>% 
     mutate(language = recode(language, "po" = "pt")) %>% 
-    mutate_at(unique(dict_factors$variable), hmatch::string_std) %>% 
+    mutate_at(unique(dict_factors$variable), string_std_simple) %>% 
     match_df_vec(dictionary = dict_factors_long, group = "language") %>% 
     match_df_vec(dictionary = dict_factors_correct, group = "language")
+  
   
   # Check for remaining non-valid values
   check_categorical <- check_df_vec(dat_factors_clean,
@@ -382,12 +382,18 @@ clean_linelist <- function(dat,
     dat_countries_clean$patinfo_ageonsetunit
   )
   
-  
   ### Update patcourse_admit and patcourse_presHCF
+  types_admit <- c(
+    "Admission in nonmedicalized structure (isolation)",
+    "First hospitalisation",
+    "First hospitalisation after a consultation",
+    "Rehospitalisation"
+  )
+  
   dat_out <- dat_countries_clean %>% 
     mutate(
       patcourse_admit = case_when(
-        MSF_visit_type %in% c("Admission to isolation center", "First hospitalisation", "First hospitalisation after a consultation", "Rehospitalisation") ~ "Yes",
+        MSF_visit_type %in% types_admit ~ "Yes",
         MSF_visit_type %in% c("First consultation") ~ "No",
         TRUE ~ patcourse_admit
       ),
