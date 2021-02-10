@@ -27,7 +27,8 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "SDN"
+    country <- "MLI"
+    site_exclude <- NULL
   }
   
   ## scan and parse linelist files to identify the most recent linelist file to
@@ -133,8 +134,9 @@ scan_sheets <- function(path_data_raw,
   ## prep dict_facilities for join
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
+    mutate(split1 = lubridate::as_date(split1)) %>% 
     mutate(site_name_join = format_text2(site_filename)) %>% 
-    select(site, country, shape, OC, project, site_name, uid,  site_name_join)
+    select(site, country, shape, OC, project, site_name, uid,  site_name_join, split1)
   
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
@@ -147,7 +149,8 @@ scan_sheets <- function(path_data_raw,
     mutate_all(as.character) %>% 
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
     select(-site_name_join) %>% 
-    mutate(file_path = file.path(path_data_raw_country, file_path))
+    mutate(file_path = file.path(path_data_raw_country, file_path)) %>% 
+    mutate(group = as.integer(lubridate::as_date(upload_date) > split1))
   
   if (any(is.na(df_sheet$site))) {
     files_no_match <- unique(basename(df_sheet$file_path[is.na(df_sheet$site)]))
@@ -156,10 +159,11 @@ scan_sheets <- function(path_data_raw,
   
   if (return_latest) {
     df_sheet <- df_sheet %>% 
-      group_by(site) %>%
+      group_by(site, group) %>%
       arrange(desc(upload_date)) %>% 
       slice(1) %>%
-      ungroup()
+      ungroup() %>% 
+      select(-any_of(c("split1", "group")))
   }
  
   ## return
