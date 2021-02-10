@@ -114,7 +114,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", "Currently no treatment", NA))
   test_set_equal(
     d_orig$msf_specific_outcome,
-    c("other", "transferred", "sent back home", "lama", "admitted", "others", "ktp", "quarrentine", NA)
+    c("other", "transferred", "sent back home", "lama", "admitted", "others", "ktp", "quarrentine", "not recovered", NA)
   )
   
 
@@ -217,7 +217,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
         is.na(msf_specific_outcome) & !outcome %in% c("Deceased", "Recovered") ~ "Other",
         tolower(msf_specific_outcome) == "lama" ~ "Left against medical advice",
         tolower(msf_specific_outcome) %in% "admitted" ~ "Other",
-        tolower(msf_specific_outcome) %in% c("others", "quarrentine", "ktp") ~ "Other", # ???
+        tolower(msf_specific_outcome) %in% c("others", "quarrentine", "ktp", "not recovered") ~ "Other", # ???
         TRUE ~ msf_specific_outcome
       )
     ) %>% 
