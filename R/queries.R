@@ -18,7 +18,6 @@ query_defs <- readxl::read_xlsx(file.path(path_queries, "query_definitions.xlsx"
 
 # variable/value combinations to exclude from Categorical queries, because
 # they're simple and common, or relate to a dictionary error
-categ_query_exclude <- readxl::read_xlsx(file.path(path_queries, "exclude_query_categ.xlsx"))
 sites_query_exclude <- readxl::read_xlsx(file.path(path_queries, "exclude_query_sites.xlsx"))
 
 
@@ -42,7 +41,7 @@ df_queries <- dplyr::bind_rows(
   queries_ident(dat_raw, dat_clean),
   queries_numeric(dat_raw),
   queries_dates(dat_raw, date_vars, dict_date_categories),
-  queries_categorical(dat_raw, dict_factors, dict_countries, categ_query_exclude, dict_countries_correct),
+  queries_categorical(dat_raw, dict_factors, dict_countries, dict_factors_correct, dict_countries_correct),
   queries_multi(dat_raw, dat_clean),
   queries_other(dat_raw, dat_clean)
 ) %>% 
@@ -55,22 +54,20 @@ df_queries_join <- df_queries %>%
   mutate(resolved_join = FALSE)
 
 
-# df_queries %>%
-#   filter(query_id == 'DATES_01') %>%
-#   count(variable1, value1, sort = TRUE) %>%
-#   print(n = 30)
 
-# df_queries %>%
-#   count(query_id, sort = T) %>%
-#   left_join(query_defs)
-# 
-# df_queries %>%
-#   filter(query_id == "CATEG_01") %>%
-#   count(variable1, value1, sort = TRUE) %>% 
-#   print(n = 20)
-# 
-# df_queries %>%
-#   count(site, sort = TRUE)
+### Summaries
+df_queries %>%
+  count(query_id, sort = TRUE) %>%
+  left_join(query_defs)
+
+df_queries %>%
+  filter(query_id == "CATEG_01") %>%
+  count(variable1, value1, sort = TRUE) %>%
+  print(n = 40)
+
+df_queries %>%
+  count(site, sort = TRUE)
+
 
 
 ### Queries old
@@ -163,9 +160,8 @@ queries_full <- bind_rows(
 queries_out <- queries_full %>% 
   left_join(df_queries_join, by = c("site", "MSF_N_Patient", "linelist_row", "query_id", "variable1", "variable2")) %>% 
   left_join(sites_query_exclude, by = c("site", "query_id")) %>% 
-  left_join(categ_query_exclude, by = c("query_id", "variable1", "value1")) %>% 
   mutate(resolved_join = ifelse(is.na(resolved_join), TRUE, resolved_join),
-         excluded_join = ifelse(exclude %in% "Yes" | exclude_categ %in% "Yes", TRUE, FALSE)) %>% 
+         excluded_join = ifelse(exclude %in% "Yes", TRUE, FALSE)) %>% 
   mutate(
     resolved_auto = case_when(
       resolved_join & excluded_join ~ "Removed",
@@ -174,7 +170,7 @@ queries_out <- queries_full %>%
     )
   ) %>% 
   mutate(date_resolved_auto = ifelse(is.na(date_resolved_auto) & resolved_join, as.character(Sys.Date()), date_resolved_auto)) %>% 
-  select(-resolved_join, -excluded_join, -exclude_categ, -exclude) %>% 
+  select(-resolved_join, -excluded_join, -exclude) %>% 
   arrange(site, query_number)
 
 

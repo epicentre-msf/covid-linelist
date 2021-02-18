@@ -124,7 +124,7 @@ queries_dates <- function(dat_raw, date_vars, dict_date_categories) {
 queries_categorical <- function(dat_raw,
                                 dict_factors,
                                 dict_countries,
-                                categ_query_exclude,
+                                dict_factors_correct,
                                 dict_countries_correct) {
   
   ## requires
@@ -173,16 +173,15 @@ queries_categorical <- function(dat_raw,
   queries[["CATEG_01"]] <- dplyr::bind_rows(
     query_match_dict(dat_prep, dict_factors, lang = "en"),
     query_match_dict(dat_prep, dict_factors, lang = "es"),
-    query_match_dict(dat_prep, dict_factors, lang = "fr")
+    query_match_dict(dat_prep, dict_factors, lang = "fr"),
+    query_match_dict(dat_prep, dict_factors, lang = "pt")
   ) %>% 
-    # use hmatch rather than dplyr::anti_join to allow variation in case
-    hmatch::hmatch(
-      categ_query_exclude,
-      by = c("variable1", "value1"),
-      allow_gaps = FALSE,
-      type = "anti",
-      std_fn = tolower
-    )
+    mutate(value1_std = hmatch::string_std(value1)) %>% 
+    semi_join(
+      filter(dict_factors_correct, query == "yes"),
+      by = c("variable1" = "variable", "value1_std" = "value")
+    ) %>% 
+    select(-value1_std)
   
   # CATEG_02 Country value does not match valid ISO3 country code
   # strict for vars report_country and patinfo_idadmin0; relaxed for others of data type Sting free text
@@ -459,13 +458,14 @@ queries_other <- function(dat_raw, dat_clean) {
 
 query_match_dict <- function(dat_prep, dict_factors, lang) {
   
-  lang <- match.arg(lang, c("en", "es", "fr"))
+  lang <- match.arg(lang, c("en", "es", "fr", "pt"))
   dict_var <- paste0("values_", lang)
   
   lang_val <- switch(lang,
                      "en" = "English",
                      "es" = "Espagnol",
-                     "fr" = "Français")
+                     "fr" = "Français",
+                     "pt" = "Portuguese")
   
   dict_prep <- dict_factors %>% 
     mutate(value_std = hmatch::string_std(!!ensym(dict_var))) %>% 
@@ -478,4 +478,5 @@ query_match_dict <- function(dat_prep, dict_factors, lang) {
     select(-linelist_lang, -value_std) %>% 
     rename(variable1 = variable, value1 = value)
 }
+
 
