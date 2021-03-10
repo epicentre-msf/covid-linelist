@@ -50,12 +50,12 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   files_ll <- c(
     HTI_B_MAR = llutils::list_files(
       file.path(path_to_files, "Martissant"),
-      pattern = "BD_LL_MT.*\\.xlsx",
+      pattern = "^BD_LL_MT.*\\.xlsx",
       select = "latest"
     ),
     HTI_B_PIM = llutils::list_files(
       file.path(path_to_files, "Port-a-Piment"),
-      pattern = "LLa PaPim.*\\.xlsx",
+      pattern = "^LLa PaPim.*\\.xlsx",
       select = "latest"
     )
   )
@@ -67,32 +67,29 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   ) %>% 
     dplyr::left_join(dict_facilities_join, by = "site")
   
-  # d_orig <- readxl::read_xlsx(file_ll, col_types = "text", na = c("", "NA")) %>% 
-  #   janitor::clean_names() %>% 
-  #   mutate(site = "HTI_B_MAR") %>% 
-  #   dplyr::left_join(dict_facilities_join, by = "site") %>% 
-  #   mutate(upload_date = as.character(llutils::extract_date(file_ll)))
 
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$symptomatique, c("oui", "non", NA))
   test_set_equal(d_orig$symptomatique_a_la_sortie,  c("oui", "non", "na, sympt. à l'admission", NA))
   
+  
   ### Derived variables
   d_derive <- d_orig %>% 
     mutate(MSF_N_Patient = paste0("TEMPID_", formatC(1:n(), width = 3, flag = "0"))) %>% 
     mutate(across(c(symptomatique, symptomatique_a_la_sortie), tolower)) %>% 
-    mutate(patcourse_asymp = case_when(
-      symptomatique == "oui" ~ "Non",
-      symptomatique == "non" ~ "Oui"
-    )) %>% 
-    mutate(outcome_asymp = case_when(
-      symptomatique == "oui" | symptomatique_a_la_sortie == "oui" ~ "Non",
-      !symptomatique %in% "oui" & symptomatique_a_la_sortie == "no" ~ "Oui"
-    ))
-  
-  # d_derive %>%
-  #   count(symptomatique, symptomatique_a_la_sortie, patcourse_asymp, outcome_asymp)
-    
+    mutate(
+      patcourse_asymp = case_when(
+        symptomatique %in% c("oui", "symptomatique") ~ "Non",
+        symptomatique %in% "non" ~ "Oui"
+      )
+    ) %>% 
+    mutate(
+      # note that outcome_asymp is asking 'Developed symptoms over the course of the disease?'
+      outcome_asymp = case_when(
+        symptomatique %in% "oui" | symptomatique_a_la_sortie %in% "oui" ~ "Oui",
+        symptomatique %in% "non" | symptomatique_a_la_sortie %in% "non" ~ "Non"
+      )
+    )
   
   ### Constants and 1:1 mappings
   d_out <- d_derive %>% 
@@ -149,6 +146,7 @@ import_hti_ocb_ <- function(path, site) {
     path, 
     col_types = "text",
     na = c("", "NA"),
+    skip = 3,
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>% 
     janitor::clean_names() %>% 
