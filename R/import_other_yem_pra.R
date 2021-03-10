@@ -27,11 +27,15 @@ import_other_yem_pra <- function(path_linelist_other, dict_linelist) {
   d_orig <- import_other_yem_pra_helper(file_ll) %>% 
     filter(!(site == "LBN_P_ELH" & as.Date(MSF_date_consultation) < as.Date("2020-06-01")))
   
-  
-  test_set_equal(d_orig$site_name, c("haydan hospital", 
-                                     "al salam hospital", 
-                                     "elias hrawi hospital"))
-  
+  test_set_equal(
+    d_orig$site_name,
+    c(
+      "haydan hospital", 
+      "al salam hospital", 
+      "elias hrawi hospital",
+      "hgr rutshuru"
+    )
+  )
   
   d_derived <- d_orig %>% 
     # derive MSF_admin_location_past_week
@@ -88,26 +92,27 @@ import_other_yem_pra_helper <- function(path) {
   
   suppressMessages(readr::read_csv(path)) %>% 
     mutate_all(as.character) %>% 
-    rename(country = Country,
-           project = Project,
-           site_name = Site_name,
-           site_type = Site_type,
-           linelist_lang = ll_language,
-           linelist_vers = ll_version,
-           upload_date = upload_Date,
-           MSF_test_results = MSF_test_first_results,
-           MSF_visit_type = MSF_readmission) %>% 
-    
-      mutate(site = case_when(
-      tolower(site_name) == "haydan hospital" ~ "YEM_P_HAY",
-      tolower(site_name) == "al salam hospital" ~ "YEM_P_ASA",
-      tolower(site_name) == "elias hrawi hospital" ~ "LBN_P_ELH"
-    ),
-    linelist_row = 1:n(),
-           upload_date = stringr::str_extract(upload_date, "[0-9]{4}.?[0-9]{2}.?[0-9]{2}"),
-           shape = dplyr::case_when(site == "YEM_P_HAY" ~ "YEM",
-                                    site == "YEM_P_ASA" ~ "YEM",
-                                    site == "LBN_P_ELH" ~ "LBN",
-                                    TRUE                ~  NA_character_),
-           OC = "OCP")
+    rename(
+      country = Country,
+      project = Project,
+      site_name = Site_name,
+      site_type = Site_type,
+      linelist_lang = ll_language,
+      linelist_vers = ll_version,
+      upload_date = upload_Date,
+      MSF_test_results = MSF_test_first_results,
+      MSF_visit_type = MSF_readmission
+    ) %>% 
+    mutate(
+      site = case_when(
+        tolower(site_name) == "haydan hospital" ~ "YEM_P_HAY",
+        tolower(site_name) == "al salam hospital" ~ "YEM_P_ASA",
+        tolower(site_name) == "elias hrawi hospital" ~ "LBN_P_ELH",
+        tolower(site_name) == "hgr rutshuru" ~ "COD_P_RUT"
+      ),
+      linelist_row = 1:n(),
+      upload_date = stringr::str_extract(upload_date, "[0-9]{4}.?[0-9]{2}.?[0-9]{2}"),
+      shape = substr(site, 1, 3),
+      OC = "OCP"
+    )
 }
