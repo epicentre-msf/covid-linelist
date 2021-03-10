@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "MLI"
+    country <- "SSD"
     site_exclude <- NULL
   }
   
@@ -107,6 +107,7 @@ scan_sheets <- function(path_data_raw,
   ## requires
   library(dplyr, warn.conflicts = FALSE)
   library(tidyr, warn.conflicts = FALSE)
+  library(rlang, warn.conflicts = FALSE)
   library(glue, warn.conflicts = FALSE)
   library(hmatch, warn.conflicts = FALSE)
   source("R/utilities.R")
@@ -133,10 +134,11 @@ scan_sheets <- function(path_data_raw,
   
   ## prep dict_facilities for join
   dict_facilities_join <- dict_facilities %>% 
+    filter(country == .env$country) %>%
     mutate_all(as.character) %>% 
     mutate(split1 = lubridate::as_date(split1)) %>% 
     mutate(site_name_join = format_text2(site_filename)) %>% 
-    select(site, country, shape, OC, project, site_name, uid,  site_name_join, split1)
+    select(site, source, country, shape, OC, project, site_name, uid,  site_name_join, split1)
   
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
@@ -159,11 +161,11 @@ scan_sheets <- function(path_data_raw,
   
   if (return_latest) {
     df_sheet <- df_sheet %>% 
-      group_by(site, group) %>%
+      group_by(site, source, group) %>%
       arrange(desc(upload_date)) %>% 
       slice(1) %>%
       ungroup() %>% 
-      select(-any_of(c("split1", "group")))
+      select(-any_of(c("split1", "group", "source")))
   }
  
   ## return
