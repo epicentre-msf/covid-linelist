@@ -11,7 +11,7 @@
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_other_jor_ocp <- function(path_linelist_other, dict_linelist) {
+import_other_jor_ocp <- function(path_linelist_other, dict_linelist, date_cutoff = NULL) {
   
   ## requires
   library(dplyr)
@@ -46,14 +46,16 @@ import_other_jor_ocp <- function(path_linelist_other, dict_linelist) {
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
   
-  files_ll <- c(
-    JOR_P_RSP = llutils::list_files(
-      path_to_files,
-      pattern = "^Amman.*\\.xlsx",
-      select = "latest"
-    )
+  files_ll <- llutils::list_files(
+    path_to_files,
+    pattern = "^Amman.*\\.xlsx"
   )
   
+  # most recent file given date cutoff
+  if (!is.null(date_cutoff)) files_ll <- files_ll[llutils::extract_date(files_ll) < as.Date(date_cutoff)]
+  files_ll <- c(JOR_P_RSP = files_ll[which.max(llutils::extract_date(files_ll))])
+
+  # read
   d_orig <- purrr::map2_dfr(
     files_ll,
     names(files_ll),

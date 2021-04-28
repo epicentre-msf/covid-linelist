@@ -8,6 +8,7 @@ source("R/compare.R")
 source("R/indicators.R")
 
 
+
 ### Clean/compile country-specific linelists
 # Import and combine linelists from each country, clean and check variables,
 # geo-match, and write resulting cleaned linelist files
@@ -29,15 +30,18 @@ ll_import_epicentre <- purrr::map_dfr(
 )
 
 
+
 ### MSF_N_Patient from OCA/BGD intersectional linelists, before they switched to GoData
 # used to filter out a few duplicates entries between intersectional ll and GoData
 id_oca_bgd_intersect <- ll_import_epicentre %>%
   filter(site == "BGD_A_KUT") %>%
   select(site, MSF_N_Patient)
 
+
 ### Import non-intersectional linelists
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
+source("R/import_other_bra_ocb.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_cod_ocp.R")
 source("R/import_other_hti_ocb.R")
@@ -53,30 +57,38 @@ source("R/import_other_bgd_godata_ocp_crf1.R")
 
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
+ll_other_bra_ocb <- import_other_bra_ocb(path_linelist_other, dict_linelist)
 # ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist) # new export to data-raw/COD seems to overlap and supersede
 ll_other_cod_ocp <- import_other_cod_ocp(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_ind_ocb <- import_other_ind_ocb(path_linelist_other, dict_linelist)
 ll_other_irq_ocb <- import_other_irq_ocb(path_linelist_other, dict_linelist)
+ll_other_jor_ocp_1 <- import_other_jor_ocp(path_linelist_other, dict_linelist, date_cutoff = "2021-01-01")
+ll_other_jor_ocp_2 <- import_other_jor_ocp(path_linelist_other, dict_linelist)
 ll_other_jor_ocp <- import_other_jor_ocp(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # still using MoH version for now
-ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist)
+ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist) # one date problem
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
 ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
+
+
+
 
 ### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
   ll_other_afg_tri,
   ll_other_bel_ocb,
+  ll_other_bra_ocb,
   # ll_other_cod_oca,
   ll_other_cod_ocp,
   ll_other_hti_ocb,
   ll_other_ind_ocb,
   ll_other_irq_ocb,
-  ll_other_jor_ocp,
+  ll_other_jor_ocp_1,
+  ll_other_jor_ocp_2,
   ll_other_pak_ocb,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
@@ -95,6 +107,16 @@ queryr::query(ll_import, is.na(country), cols_base = c(country, OC), count = TRU
 queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE) #!!!
 
 
+# check for patient_id dropped since previous compilation
+# known issues:
+# - ETH_E_GRH (use patient names as IDs)
+# - MWI_P_QCH (missing 30 IDs)
+llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
+  readRDS() %>%
+  anti_join(ll_import, by = c("site", "MSF_N_Patient")) %>%
+  count(site)
+
+
 # save raw country-specific RDS files
 purrr::walk(
   sort(unique(ll_import$country)),
@@ -104,6 +126,8 @@ purrr::walk(
 
 
 ### Implement cleaning routines
+source("R/zzz.R") # in case of update to dictionaries
+
 ll_cleaned <- ll_import %>% 
   # temp solution for ETH_E_GRH to remove names (will be replace with TEMP_001, ...)
   mutate(MSF_N_Patient = ifelse(site == "ETH_E_GRH", NA_character_, MSF_N_Patient)) %>%
@@ -127,6 +151,15 @@ ll_cleaned <- ll_import %>%
   )
 
 
+matchmaker::check_df(
+  ll_cleaned,
+  dict_factors,
+  col_vals = "values_en",
+  col_vars = "variable",
+  always_allow_na = TRUE
+)
+
+
 purrr::walk(
   sort(unique(ll_cleaned$country)),
   write_by_country,
@@ -135,7 +168,9 @@ purrr::walk(
 )
 
 
+
 ### Geocoding routines
+### PROBLEM WITH GEOCODING OUTPUT FOR YEM, AND SYR
 ll_geocode <- purrr::map_dfr(
   countries_update,
   clean_geo,
@@ -144,19 +179,19 @@ ll_geocode <- purrr::map_dfr(
   write_checks = TRUE
 )
 
-# fetch_georef("VEN") %>%
+# fetch_georef("COD") %>%
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("PAK"))
+# View(fetch_georef("SSD"))
 
 
 # check again for missing values among important columns
 queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
-queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, report_date), count = TRUE)
+queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, site), count = TRUE) %>% count(site)
+
 
 purrr::walk(
   countries_update,
@@ -167,6 +202,9 @@ purrr::walk(
 
 
 ### Compile global linelist
+triage_sites <- dict_facilities %>% 
+  distinct(site, triage_site)
+
 d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linelist", full.names = TRUE) %>% 
   purrr::map_dfr(readRDS) %>% 
   derive_event_date() %>% 
@@ -175,7 +213,9 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
   rename(ll_language = linelist_lang, ll_version = linelist_vers) %>% 
   arrange(site) %>% 
   mutate(db_row = 1:n()) %>% 
-  mutate(triage_site = ifelse(site %in% c("AFG_P_HRH", "AFG_P_IDP"), "Yes", "No"), .after = "site_type") %>% 
+  left_join(triage_sites, by = "site") %>%
+  mutate(triage_site = if_else(is.na(triage_site), "No", triage_site)) %>% 
+  relocate(triage_site, .after = "site_type") %>% 
   mutate(OC = ifelse(OC == "OCB_&_OCP", "OCB/OCP", OC)) %>% 
   # filter(!(site == "CAF_A_BBY" & is.na(patcourse_asymp) & is.na(patinfo_ageonset))) # remove autopopulated ghost-rows
   mutate(
@@ -191,9 +231,8 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
 # check for patient_id dropped since previous compilation
 llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
   readRDS() %>% 
-  anti_join(d_global, by = "patient_id") %>% 
+  anti_join(d_global, by = "patient_id") %>%
   count(site)
-
 
 
 # double-check for allowed values
@@ -229,7 +268,7 @@ purrr::walk(
 
 ### Write OC-specific files
 queryr::query(d_global, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
-dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(country, OC), count = TRUE)
+dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(site), count = TRUE) %>% count(site)
 
 d_global_his <- d_global %>% 
   mutate(across(all_of(date_vars), .fns = date_format)) %>% 
