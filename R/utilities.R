@@ -1,4 +1,12 @@
 
+
+print_and_capture <- function(x) {
+  # useful for adding a data.frame to a message() or warning()
+  if ("tbl" %in% class(x)) x <- as.data.frame(x)
+  paste(utils::capture.output(print(x)), collapse = "\n")
+}
+
+
 merge_vars <- function(var1, var2) {
   var1_std <- tolower(var1)
   var2_std <- tolower(var2)

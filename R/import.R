@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "SSD"
+    country <- "SYR"
     site_exclude <- NULL
   }
   
@@ -71,6 +71,58 @@ import_linelists <- function(country,
     ) %>% 
     select(-file_path) %>%
     tidyr::unnest("df") %>% 
+    ## account for export from SYR_A_RNH which was split to limit file size
+    filter(!(site == "SYR_A_RNH" & lubridate::as_date(upload_date) < as.Date("2021-03-10") & as_integer_quiet(gsub("R0000", "", MSF_N_Patient)) >= 2870))
+
+  ## check for valid values of MSF_name_facility at site SYR_P_ALA
+  if ("SYR_P_ALA" %in% df_data$site) {
+    
+    # file to extract MSF_N_Patient - MSF_name_facility combinations
+    file_map_SYR_P_ALA <- file.path(
+      path_data_raw,
+      "SYR",
+      "linelist_Covid_anonymous__SYR__OCP____Covid Treatment Center__Alameen CCTC__1676__2021-03-17_13-15.xlsx"
+    )
+    
+    # extract MSF_N_Patient - MSF_name_facility combinations
+    map_SYR_P_ALA <- readxl::read_xlsx(
+      file_map_SYR_P_ALA,
+      sheet = "linelist",
+      col_types = "text",
+      na = c("", "NA"),
+      .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
+    ) %>% 
+      distinct(MSF_N_Patient, MSF_name_facility)
+    
+    # recode MSF_name_facility for site 
+    df_data <- df_data %>% 
+      llutils::recode_conditional(map_SYR_P_ALA, col_recode = "MSF_name_facility")
+    
+    # check for non-valid sites
+    non_valid_site <- df_data %>% 
+      filter(site == "SYR_P_ALA", !MSF_name_facility %in% c("Al-Ameen OPD", "Al-Ameen CCTC", "Al-Ameen MC")) %>% 
+      count(MSF_name_facility)
+    
+    if (nrow(non_valid_site) > 0) {
+      warning(
+        "Non-standard values of MSF_name_facility for site SYR_P_ALA:\n",
+        print_and_capture(non_valid_site),
+        call. = FALSE
+      )
+    }
+    
+    df_data <- df_data %>% 
+      filter(!(site %in% "SYR_P_ALA" & is.na(MSF_name_facility)))
+  }
+  
+  df_data <- df_data %>% 
+    ## account for SYR_P_ALA which contains 3 sites
+    mutate(
+      site_name = case_when(
+        site == "SYR_P_ALA" ~ MSF_name_facility,
+        TRUE ~ site_name
+      )
+    ) %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n())
   
@@ -202,8 +254,8 @@ read_and_prepare_data <- function(file_path,
   
   ## only for running manually
   if (FALSE) {
-    file_path <- df_sheets$file_path[1]
-    site <- df_sheets$site[1]
+    file_path <- df_sheets$file_path[2]
+    site <- df_sheets$site[2]
     remove_almost_empty = TRUE
   }
   
