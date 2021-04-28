@@ -146,7 +146,7 @@ import_hti_ocb_ <- function(path, site) {
     path, 
     col_types = "text",
     na = c("", "NA"),
-    skip = 3,
+    # skip = 3,
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>% 
     janitor::clean_names() %>% 
