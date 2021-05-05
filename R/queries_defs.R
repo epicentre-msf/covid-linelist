@@ -59,7 +59,7 @@ queries_dates <- function(dat_raw, date_vars, dict_date_categories) {
     mutate_at(all_of(date_vars), as.character)
   
   dates_parse <- dates_raw %>% 
-    mutate_at(all_of(vars_check), parse_dates)
+    mutate_at(all_of(vars_check), ~ suppressWarnings(parse_dates(.x)))
 
   ## queries
   queries <- list()

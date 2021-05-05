@@ -226,7 +226,7 @@ parse_excel_dates <- function(x) {
 
 parse_other_dates <- function(x, order = c("Ymd", "dmY", "dmy", "mdY", "Ymd HMS")) {
   x <- as.character(x)
-  x <- as.character(lubridate::parse_date_time(x, order = order))
+  x <- as.character(lubridate::parse_date_time(x, order = order, quiet = TRUE))
   x
 }
 
