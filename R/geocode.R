@@ -26,7 +26,7 @@ clean_geo <- function(country,
   
   ## when running manually
   if (FALSE) {
-    country <- "BGD"
+    country <- "YEM"
     write_checks <- TRUE
   }
   
@@ -146,7 +146,7 @@ clean_geo <- function(country,
       left_join(df_manual_check_join, by = raw_names) %>%
       mutate(level_raw = best_geolevel(., "^adm[[:digit:]]"),
              level_ref = best_geolevel(., "^ref_adm[[:digit:]]")) %>% 
-      filter(!match_type %in% c("complete", "fuzzy"), match_type == "manual" | level_ref < 3) %>% 
+      filter(!match_type %in% c("complete", "fuzzy"), match_type == "manual" | (level_raw >= 2 & level_ref < 2)) %>% 
       unique() %>% 
       arrange(adm1, adm2, adm3, adm4) %>% 
       mutate(new = if_else(is.na(new), "Yes", NA_character_)) %>% 
