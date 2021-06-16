@@ -18,7 +18,7 @@ source("R/utilities.R")
 path_onedrive <- switch(
   Sys.info()["user"],
   "patrickbarks" = path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi"),
-  "M-MOUSSET"     = path.expand("D:/MSF/GRP-EPI-COVID-19 - NCoVEpi"),                        # Mathilde to edit
+  "M-MOUSSET"     = path.expand("D:/MSF/GRP-EPI-COVID-19 - NCoVEpi"),
   path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi")          # generic Mac path 
   )
 
