@@ -106,7 +106,7 @@ ll_import <- dplyr::bind_rows(
 
 
 # check for missing values among important columns
-queryr::query(ll_import, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
+queryr::query(ll_import, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE) # MWI has 30, not gonna change
 queryr::query(ll_import, is.na(site), cols_base = c(country, OC), count = TRUE) #!!!!
 queryr::query(ll_import, is.na(linelist_lang), cols_base = c(country, OC), count = TRUE) #!!
 queryr::query(ll_import, is.na(upload_date), cols_base = c(country, OC), count = TRUE)
@@ -125,6 +125,12 @@ llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
 
 
 # save raw country-specific RDS files
+
+if (!dir.exists("local")) dir.create("local")
+if (!dir.exists("local/clean")) dir.create("local/clean")
+if (!dir.exists("local/final")) dir.create("local/final")
+if (!dir.exists("local/raw")) dir.create("local/raw")
+
 purrr::walk(
   sort(unique(ll_import$country)),
   write_by_country,
@@ -154,7 +160,7 @@ ll_cleaned <- ll_import %>%
     dict_numeric_correct,
     dict_factors_correct,
     dict_countries_correct,
-    write_checks = TRUE
+    write_checks = TRUE # Can set to FALSE to debug
   )
 
 
