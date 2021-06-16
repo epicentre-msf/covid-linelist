@@ -76,6 +76,22 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     dplyr::left_join(dict_facilities_join, by = "site")
   
   
+  if (!"addresses_location_1_location_geographical_level_1" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1_location_geographical_level_1 = NA_character_)
+  }
+  if (!"addresses_location_1_location_geographical_level_2" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1_location_geographical_level_2 = NA_character_)
+  }
+  if (!"addresses_location_1_location_geographical_level_3" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(addresses_location_1_location_geographical_level_3 = NA_character_)
+  }
+  if (!"hiv_immunodeficiency" %in% names(d_orig)) {
+    d_orig <- d_orig %>% 
+      mutate(hiv_immunodeficiency = NA_character_)
+  }
   if (!"addresses_location_1" %in% names(d_orig)) {
     d_orig <- d_orig %>% 
       mutate(addresses_location_1 = NA_character_, .before = addresses_location_1_location_geographical_level_1)
