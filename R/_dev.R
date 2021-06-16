@@ -8,7 +8,6 @@ source("R/compare.R")
 source("R/indicators.R")
 
 
-
 ### Clean/compile country-specific linelists
 # Import and combine linelists from each country, clean and check variables,
 # geo-match, and write resulting cleaned linelist files
@@ -27,8 +26,9 @@ ll_import_epicentre <- purrr::map_dfr(
   dict_linelist = dict_linelist,
   dict_extra_vars = dict_extra_vars,
   site_exclude = "BGD_P_IPD" # switched to godata
-)
-
+) %>% 
+  # temp measure to exclude 6 duplicate rows
+  filter(!(site %in% "MWI_P_QCH" & MSF_name_facility %in% "South Lunzu Health Centre | South Lunzu Ward"))
 
 
 ### MSF_N_Patient from OCA/BGD intersectional linelists, before they switched to GoData
@@ -41,7 +41,10 @@ id_oca_bgd_intersect <- ll_import_epicentre %>%
 ### Import non-intersectional linelists
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
+source("R/import_other_bel_ocb_gal.R")
+source("R/import_other_bel_ocb_snk.R")
 source("R/import_other_bra_ocb.R")
+source("R/import_other_bra_ocp.R")
 source("R/import_other_cod_oca.R")
 source("R/import_other_cod_ocp.R")
 source("R/import_other_hti_ocb.R")
@@ -57,7 +60,10 @@ source("R/import_other_bgd_godata_ocp_crf1.R")
 
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
+ll_other_bel_ocb_gal <- import_other_bel_ocb_gal(path_linelist_other, dict_linelist)
+ll_other_bel_ocb_snk <- import_other_bel_ocb_snk(path_linelist_other, dict_linelist)
 ll_other_bra_ocb <- import_other_bra_ocb(path_linelist_other, dict_linelist)
+ll_other_bra_ocp <- import_other_bra_ocp(path_linelist_other, dict_linelist)
 # ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist) # new export to data-raw/COD seems to overlap and supersede
 ll_other_cod_ocp <- import_other_cod_ocp(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
@@ -74,14 +80,15 @@ ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelis
 ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
 
 
-
-
 ### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
   ll_other_afg_tri,
   ll_other_bel_ocb,
+  ll_other_bel_ocb_gal,
+  ll_other_bel_ocb_snk,
   ll_other_bra_ocb,
+  ll_other_bra_ocp,
   # ll_other_cod_oca,
   ll_other_cod_ocp,
   ll_other_hti_ocb,
@@ -168,9 +175,7 @@ purrr::walk(
 )
 
 
-
 ### Geocoding routines
-### PROBLEM WITH GEOCODING OUTPUT FOR YEM, AND SYR
 ll_geocode <- purrr::map_dfr(
   countries_update,
   clean_geo,
@@ -183,7 +188,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("SSD"))
+# View(fetch_georef("IND"))
 
 
 # check again for missing values among important columns
@@ -268,7 +273,7 @@ purrr::walk(
 
 ### Write OC-specific files
 queryr::query(d_global, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
-dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(site), count = TRUE) %>% count(site)
+dup_id <- queryr::query(d_global, duplicated(patient_id), cols_base = c(site), count = TRUE)
 
 d_global_his <- d_global %>% 
   mutate(across(all_of(date_vars), .fns = date_format)) %>% 

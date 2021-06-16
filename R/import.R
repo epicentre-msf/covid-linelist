@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "SYR"
+    country <- "YEM"
     site_exclude <- NULL
   }
   
@@ -73,7 +73,7 @@ import_linelists <- function(country,
     tidyr::unnest("df") %>% 
     ## account for export from SYR_A_RNH which was split to limit file size
     filter(!(site == "SYR_A_RNH" & lubridate::as_date(upload_date) < as.Date("2021-03-10") & as_integer_quiet(gsub("R0000", "", MSF_N_Patient)) >= 2870))
-
+  
   ## check for valid values of MSF_name_facility at site SYR_P_ALA
   if ("SYR_P_ALA" %in% df_data$site) {
     
@@ -116,11 +116,16 @@ import_linelists <- function(country,
   }
   
   df_data <- df_data %>% 
-    ## account for SYR_P_ALA which contains 3 sites
     mutate(
+      ## account for SYR_P_ALA which contains 3 sites
       site_name = case_when(
         site == "SYR_P_ALA" ~ MSF_name_facility,
         TRUE ~ site_name
+      ),
+      ## avoid duplicate patients IDs with prev non-intersect. linelist for YEM_P_SAN
+      MSF_N_Patient = case_when(
+        site %in% "YEM_P_SAN" ~ paste0("N00", MSF_N_Patient),
+        TRUE ~ MSF_N_Patient
       )
     ) %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
@@ -280,22 +285,7 @@ read_and_prepare_data <- function(file_path,
     "^Añadir el nombre",
     "^Ajouter le nom",
     "^Add variable name",
-    "^MSF_variable_additional",
-    "^MSF_test_type_detail",
-    "^MSF_lab_date_[2-4]",
-    "^MSF_lab_name_[2-4]", 
-    "^MSF_sample_type_[2-4]",
-    "^MSF_test_type_[2-4]",
-    "^MSF_test_results_[2-4]",
-    "^MSF_test_other_date",
-    "^MSF_test_other_type", 
-    "^MSF_test_other_result",
-    "^MSF_tb_type",
-    "^MSF_outcome_ICU_days", 
-    "^MSF_outcome_ventilated_days",
-    "^MSF_home_base_care",
-    "^MSF_former_status", 
-    "^MSF_next status"
+    "^MSF_variable_additional"
   )
   
   ## prepare output
@@ -304,6 +294,11 @@ read_and_prepare_data <- function(file_path,
     mutate_all(as.character) %>% 
     janitor::remove_empty("rows") %>%
     mutate(linelist_row = seq_len(n()), .before = 1)
+  
+  # filter MWI Health Center sites based on MSF_name_facility
+  if (site %in% "MWI_P_CHI") out_prep <- filter(out_prep, MSF_name_facility %in% "Chilomoni Health Centre | Chilomoni Ward")
+  if (site %in% "MWI_P_SLZ") out_prep <- filter(out_prep, MSF_name_facility %in% "South Lunzu Health Centre | South Lunzu Ward")
+  
   
   ## add linelist version and language
   site_meta <- get_site_meta(file_path)
@@ -354,4 +349,5 @@ recode_columns <- function(x, dict_extra_vars) {
   
   return(out$orig)
 }
+
 

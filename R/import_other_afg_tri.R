@@ -36,15 +36,20 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     bind_rows(d_orig_old)
   
   site_meta <- data.frame(
-    msf_facitity = c("hrh", "idp"),
-    site = c("AFG_P_HRH", "AFG_P_IDP"),
-    project = c("HET", "HEI"),
-    site_type = c("Other facility", "Health Centre"),
-    site_name = c("Herat Regional Hospital MSF COVID-19 Triage", "MSF IDP Clinic")
+    msf_facitity = c("hrh", "idp", "c", "hrh ward"),
+    site = c("AFG_P_HRH", "AFG_P_IDP", "AFG_P_IPA", "AFG_P_IPA"),
+    project = c("HET", "HEI", NA, NA),
+    site_type = c("Other facility", "Health Centre", NA, NA),
+    site_name = c(
+      "Herat Regional Hospital MSF COVID-19 Triage",
+      "MSF IDP Clinic",
+      "Herat Regional Hospital - Inpatient Assessment",
+      "Herat Regional Hospital - Inpatient Assessment"
+      )
   )
   
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$msf_facitity, c("hrh", "idp"))
+  test_set_equal(d_orig$msf_facitity, c("hrh", "idp", "c", "hrh ward"))
   test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", "unknown", "non recorded", NA))
   test_set_equal(d_orig$hiv_status, c("positive", "negative", "no", "unknown", NA))
   test_set_equal(d_orig$if_positive_on_arv, c("yes", "no", "unknown", NA))
@@ -131,7 +136,6 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   # # examine variable combos relevant to derivation of MSF_refer_to
   # d_derived %>%
   #   count(referral, if_other_59, MSF_refer_to)
-  
   
   ### Recode columns with straightforward mapping to Epicentre variables
   d_recode <- d_derived %>% 
@@ -247,7 +251,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   # check for new columns to be manually renamed
   extra_cols <- grep("^extra__", names(df_data), value = TRUE)
   new_cols <- setdiff(names(df_data), c(cols_derive, ll_template, extra_cols))
-  
+
   ## return
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
 }
