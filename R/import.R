@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "YEM"
+    country <- "SYR"
     site_exclude <- NULL
   }
   
@@ -259,8 +259,8 @@ read_and_prepare_data <- function(file_path,
   
   ## only for running manually
   if (FALSE) {
-    file_path <- df_sheets$file_path[2]
-    site <- df_sheets$site[2]
+    file_path <- df_sheets$file_path[6]
+    site <- df_sheets$site[6]
     remove_almost_empty = TRUE
   }
   
@@ -271,7 +271,8 @@ read_and_prepare_data <- function(file_path,
     col_types = "text",
     na = c("", "NA"),
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
-  )
+  ) %>% 
+    select(-starts_with("\u0625"))
   
   ## remove rows with 3 or fewer non-missing values
   if (remove_almost_empty) {
