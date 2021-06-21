@@ -11,8 +11,26 @@ source("R/zzz.R")
 
 
 ###
-### ** Update comments column at each compilation
-###
+### ** Note to PB: Revise code to update comments column at each compilation
+
+tracker_files <- llutils::list_files(
+  path_implementation,
+  pattern = "site_implementation_summary_"
+)
+
+comments <- purrr::map_dfr(
+  tracker_files, 
+  ~ readxl::read_xlsx(.x) %>% select(site = site_code, any_of("comment"))
+) %>% 
+  filter(!is.na(comment)) %>% 
+  unique()
+
+
+# # check for updated comments fields
+# dict_facilities %>% 
+#   select(site, comment_dict = comment) %>% 
+#   left_join(comments, by = "site") %>% 
+#   filter(is.na(comment_dict) & !is.na(comment))
 
 
 ### Read latest global ll
@@ -68,6 +86,7 @@ site_meta_v3 <- ll_files_latest %>%
     starts_with("center"),
     starts_with("case_definition")
   ) %>% 
+  unique() %>% 
   mutate(across(matches("^center_|^case_def"), ~ dplyr::na_if(.x, "0"))) %>% 
   mutate(across(matches("^center_"), ~ dplyr::recode(.x, "Oui" = "Yes", "Non" = "No")))
 
@@ -105,7 +124,7 @@ dat_summary <- dat %>%
 ### Assemble output
 out <- dict_facilities %>% 
   mutate(geobase_available = ifelse(shape %in% geobase, "Yes", "No")) %>% 
-  select(site, country = country_full, OC, project, site_type, site_name, geobase_available, comment) %>% 
+  distinct(site, country = country_full, OC, project, site_type, site_name, geobase_available, comment) %>% 
   inner_join(site_meta_comp, by = "site") %>% 
   left_join(first_upload, by = "site") %>% 
   left_join(site_meta_v3, by = c("site", "version")) %>% 
@@ -123,6 +142,7 @@ out <- dict_facilities %>%
     visits, starts_with("prop"),
     comment, starts_with("case_def")
   )
+
 
 ### Date of most recent Sunday (flag if latest upload before)
 (cutoff_date <- floor_date(today(), "week"))
@@ -144,11 +164,14 @@ qxl::qxl(
     cols = starts_with("prop_adm"),
     bgFill = "#FFC7CE"
   ),
-  style2 = qstyle(
-    rows = as.Date(latest_upload) < as.Date("2021-01-24"), # swap in cutoff_date
+  style2 = qxl::qstyle(
+    rows = as.Date(latest_upload) < as.Date("2021-06-13"), ### *** swap in cutoff_date
     cols = latest_upload,
     bgFill = "#FFC7CE"
   ),
   filter = TRUE
 )
+
+
+# paste(paste0("@", sample(c("Anais", "Mathilde", "Paul")), collapse = ", "), "compilation is ready") %>% cat()
 
