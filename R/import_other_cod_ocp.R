@@ -67,7 +67,11 @@ import_other_cod_ocp <- function(path_linelist_other, dict_linelist) {
   # test_set_equal(d_orig$msf_symptom_joint_pain, c("yes", "no", "unknown", NA))
   # test_set_equal(d_orig$comcond_chronic_lung_disease, c("yes", "no", "unknown", NA))
   test_set_equal(d_orig$antecedant_comorbidite, c("diabetique", "hepatite b", "hta", "hypertension  arterielle", "hypertension  arterielle instable", "ras", NA))
-  test_set_equal(d_orig$mode_de_sortie_gueri_decede_abandon_transfert, c("décédé", "guerri", "transferé", "hospitalisation", NA))
+  # test_set_equal(d_orig$mode_de_sortie_gueri_decede_abandon_transfert, 
+                 # c("décédé", "guerri", "transferé", "hospitalisation", NA))
+  
+  test_set_equal(d_orig$mode_de_sortie_gueri_decede_abandon_transfert,
+                 c("d\U00E9c\U00E9d\U00E9", "guerri", "transfer\U00E9", "hospitalisation", NA))
   
   ### Derived variables
   d_derive <- d_orig %>% 
