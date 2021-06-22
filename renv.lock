@@ -1,6 +1,6 @@
 {
   "R": {
-    "Version": "4.0.2",
+    "Version": "4.0.3",
     "Repositories": [
       {
         "Name": "CRAN",
@@ -51,6 +51,13 @@
       "Repository": "CRAN",
       "Hash": "e031418365a7f7a766181ab5a41a5716"
     },
+    "RSQLite": {
+      "Package": "RSQLite",
+      "Version": "2.2.7",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "71f19d00a7736b24492fb26b483bc450"
+    },
     "Rcpp": {
       "Package": "Rcpp",
       "Version": "1.0.6",
@@ -85,6 +92,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "50c838a310445e954bc13f26f26a6ecf"
+    },
+    "aweek": {
+      "Package": "aweek",
+      "Version": "1.0.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "8a5d6323e38f0ab57fbf069cf49f9155"
     },
     "backports": {
       "Package": "backports",
@@ -128,6 +142,13 @@
       "Repository": "CRAN",
       "Hash": "06015476250468fc013c30022118ce3a"
     },
+    "cachem": {
+      "Package": "cachem",
+      "Version": "1.0.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5346f76a33eb7417812c270b04a5581b"
+    },
     "callr": {
       "Package": "callr",
       "Version": "3.7.0",
@@ -141,20 +162,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "f61dbaec772ccd2e17705c1e872e9e7c"
-    },
-    "checkmate": {
-      "Package": "checkmate",
-      "Version": "2.0.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "a667800d5f0350371bedeb8b8b950289"
-    },
-    "chron": {
-      "Package": "chron",
-      "Version": "2.3-56",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "2d8e9b1143af1caf26a521ed26e8736b"
     },
     "cli": {
       "Package": "cli",
@@ -176,13 +183,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "6cab523af06ac301e7a40c5529d45882"
-    },
-    "commonmark": {
-      "Package": "commonmark",
-      "Version": "1.7",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "0f22be39ec1d141fd03683c06f3a6e67"
     },
     "countrycode": {
       "Package": "countrycode",
@@ -216,6 +216,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "e75525c55c70e5f4f78c9960a4b402e9"
+    },
+    "credentials": {
+      "Package": "credentials",
+      "Version": "1.3.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a96728288c75a814c900af9da84387be"
     },
     "curl": {
       "Package": "curl",
@@ -286,6 +293,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "c98eb5133d9cb9e1622b8691487f11bb"
+    },
+    "fastmap": {
+      "Package": "fastmap",
+      "Version": "1.1.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "77bd60a6157420d4ffa93b27cf6a58b8"
     },
     "forcats": {
       "Package": "forcats",
@@ -363,13 +377,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "fd028aa45f6785d7e83c0ed896b45904"
-    },
-    "gt": {
-      "Package": "gt",
-      "Version": "0.2.2",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "4eb28493ed31ff8f5f240d0fb5929ecb"
     },
     "gtable": {
       "Package": "gtable",
@@ -540,6 +547,13 @@
       "RemoteSha": "22999959360523155fb86a6bb7495e7d492a8dbd",
       "Hash": "f957fd2dcad134b6f46ea1d0794cf948"
     },
+    "memoise": {
+      "Package": "memoise",
+      "Version": "2.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a0bc51650201a56d00a4798523cc91b3"
+    },
     "mgcv": {
       "Package": "mgcv",
       "Version": "1.8-35",
@@ -575,18 +589,6 @@
       "Repository": "CRAN",
       "Hash": "35de1ce639f20b5e10f7f46260730c65"
     },
-    "nmatch": {
-      "Package": "nmatch",
-      "Version": "0.1.0",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "nmatch",
-      "RemoteUsername": "epicentre-msf",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "06185c313106ad72a40bce60f6b59050d86275a0",
-      "Hash": "14e874fc7464a9178f241914787baac0"
-    },
     "nnet": {
       "Package": "nnet",
       "Version": "7.3-16",
@@ -621,6 +623,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "01f28d4278f15c76cddbea05899c5d6f"
+    },
+    "plogr": {
+      "Package": "plogr",
+      "Version": "0.2.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "09eb987710984fc2905c7129c7d85e65"
     },
     "prettyunits": {
       "Package": "prettyunits",
@@ -723,18 +732,6 @@
       "Repository": "CRAN",
       "Hash": "b72766319c62f35c0d8f3418c2eeb56d"
     },
-    "redcap": {
-      "Package": "redcap",
-      "Version": "0.1.0",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteUsername": "epicentre-msf",
-      "RemoteRepo": "redcap",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "5ba52ea61b33e21d68a78746454aa1657e4bfadf",
-      "RemoteHost": "api.github.com",
-      "Hash": "1eb6d797d93785a25b244ec5a9015015"
-    },
     "rematch": {
       "Package": "rematch",
       "Version": "1.0.1",
@@ -798,13 +795,6 @@
       "Repository": "CRAN",
       "Hash": "74b905b0076e1de6e27f540c95ba68d5"
     },
-    "sass": {
-      "Package": "sass",
-      "Version": "0.3.1",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "3ef1adfe46b7b144b970d74ce33ab0d6"
-    },
     "scales": {
       "Package": "scales",
       "Version": "1.1.1",
@@ -825,6 +815,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "4079070fc210c7901c0832a3aeab894f"
+    },
+    "ssh": {
+      "Package": "ssh",
+      "Version": "0.8.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "bc758de384073dd8e913f2a68f411dc3"
     },
     "stringdist": {
       "Package": "stringdist",
@@ -942,13 +939,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "55e157e2aa88161bdb0754218470d204"
-    },
-    "vroom": {
-      "Package": "vroom",
-      "Version": "1.4.0",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "06340eb63f5095463420837782c084c1"
     },
     "withr": {
       "Package": "withr",
