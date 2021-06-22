@@ -77,7 +77,7 @@ ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # s
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist) # one date problem
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
-ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist)
+ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist) # Always problems. If too bad, omit the file.
 
 
 ### Bind Intersectional and Other imports
@@ -164,6 +164,7 @@ ll_cleaned <- ll_import %>%
   )
 
 
+
 matchmaker::check_df(
   ll_cleaned,
   dict_factors,
@@ -194,7 +195,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("IND"))
+# View(fetch_georef("AFG"))
 
 
 # check again for missing values among important columns
@@ -204,6 +205,7 @@ queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count =
 queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, site), count = TRUE) %>% count(site)
 
 
+# Make sure this works!!! (needed later)
 purrr::walk(
   countries_update,
   write_by_country,
@@ -239,7 +241,7 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
   )
 
 
-# check for patient_id dropped since previous compilation
+# check for patient_id dropped since previous compilation (worry if big numbers)
 llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
   readRDS() %>% 
   anti_join(d_global, by = "patient_id") %>%
