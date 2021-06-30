@@ -195,7 +195,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("YEM"))
+# View(fetch_georef("IND"))
 
 
 # check again for missing values among important columns

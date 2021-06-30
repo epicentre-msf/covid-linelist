@@ -1,0 +1,156 @@
+---
+title: "Notes compilation Mathilde"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Unprotect raw data
+
+Raw data are stored in: *D:*\MSF\GRP*-EPI-COVID-19 - NCoVEpi\data*-raw
+
+To get things to work properly, you need to **pause the synchronisation
+during the process** (or you will get unhelpfull error from Excel-VBA).
+
+## Epicentre linelists
+
+If you are on MAC OS, use the *unprotect.xlsm* file (open, activate the
+macro if necessary, and click on the button to run the script). If you
+are on Windows, use the *unprotect-window.xlsm* file.
+
+This will unprotect the original .*xlsb* file, archive them and keep an
+unprotected .*xlsx* file in the main folder, ready to be compiled.
+
+## Other linelists
+
+OCA Bengladesh files are still protected, you need to unprotect them
+(covidExport).
+
+*D:\\MSF\\GRP-EPI-COVID-19 -
+NCoVEpi\\data-raw\\linelist-other\\OCA\\BGD*
+
+# Compilation
+
+Now, files are going to live in *D:*\MSF\GRP*-EPI-COVID-19 -
+NCoVEpi\data*-cleaning
+
+If you have never worked with this project, go to *zzz.R* to check that
+your access paths to the Sharepoint are correctly set or add yourself.
+
+The master script is *\_dev.R*
+
+## Import MSF intersection
+
+I am likely to see warnings. I will have to go and do some checks.
+
+**"No site match within dict_facilities for file(s)"**
+
+Check the linelists (number of patients, dates or ages...). If same site
+as before, rename. If really a new entry, add it to the
+*dict_facilities.xlsx* (in *D:*\MSF\GRP*-EPI-COVID-19 -
+NCoVEpi\data*-cleaning\dictionaries). **If I update the dictionary,
+resource all the scripts at the begining!**
+
+IF sitename *wrong* =\> just rename file, or dict_facility. If sitename
+the same, but they splitted (non overlapping content) =\> split. If same
+site but different name (eg they closed and then reopened) =\> source
+
+**Non-standard values of MSF_name_facility for site SYR_P\_ALA**
+
+This is fine as long as there is only NA. If not, we need to fix those
+in *import.R* (SYR_P\_ALA). If it's very high numbers, tell Flavio. (4
+is fine).
+
+If problem with godata, omit the most recent one (and follow up with the
+site) add "omit\_" as prefix for intersectional linelist, but may not
+work for specific folders. Create a temporary folder within the folder
+to hide the culprit linelist.
+
+## Non intersection file
+
+Some warning we can ignore. Check the mapping file. If a new value needs
+to be mapped, add it. Sometimes you don't need to map it (not used in
+our mapping). Sometmes it will be dealt later in the cleaning.
+
+# Queries
+
+## IDs
+
+If another one tha MWI with many missing IDs, look into the linelist to
+check that it's not an import problem (importing empty lines?).
+
+Same for dropped ID. Maybe they changed their system? (and then that's
+fine).
+
+Or if a site decides to send a new linelist because the other one was
+too late. So we will see disapearing IDs because we only import the only
+site. Then I need to modify the import to tell to import both. Go to
+dict_facilities, add split date
+
+If !!! as comments, it HAS TO BE FIXED. Worst case, omit the most recent
+export...
+
+# Cleaning
+
+## Note
+
+Dictionaries are overwritten (with an archived version). Other
+correction files are time stamped.
+
+# Date
+
+D:\MSF\GRP-EPI-COVID-19 - NCoVEpi\data-cleaning\manual-corrections
+
+FORMAT date_correct column to TEXT!!! (and be careful with carelessly
+copying a date into it)
+
+# Factors
+
+Go to dict_factor_correct to correct the values if warnign. Go to
+dict_factor to see the allowed value for each language. Note: at that
+point, we are still correcting within a language (good luck with
+arabic...)
+
+## Geocode
+
+Wedon't bother as much. No action is required withthe dictionnary.
+
+D:\MSF\GRP-EPI-COVID-19 -
+NCoVEpi\data-cleaning\manual-corrections\geocodes
+
+Sometimes, a line will appear that looks good already, but actually it
+is because there is a slight variation on an existing entry.(see
+match_type level_raw level_ref columns).
+
+If I make ani changes, rerun code again.
+
+## Duplicates
+
+Are "fine" (i.e. not our problem):
+
+-   AFG_P\_HRH
+
+-   MWI_P\_QCH
+
+-   UKR_G\_HBC (home visits)
+
+If a new one appears with \> 100 duplicates, then have a look at what's
+happening.
+
+## Check for dropped patients
+
+Another check post compilation. If there are big numbers of removed
+patients. First check if the change seems legit (eg they changed their
+ids). If not, it is possible to omit that file for this compilation (and
+rerun everything) and contact Anais.
+
+# Implementation
+
+run the implementation script.
+
+Get date from 148 to code 168
