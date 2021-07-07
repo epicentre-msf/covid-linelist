@@ -165,7 +165,7 @@ qxl::qxl(
     bgFill = "#FFC7CE"
   ),
   style2 = qxl::qstyle(
-    rows = as.Date(latest_upload) < as.Date("2021-06-27"), ### *** swap in cutoff_date
+    rows = as.Date(latest_upload) < as.Date("2021-07-04"), ### *** swap in cutoff_date
     cols = latest_upload,
     bgFill = "#FFC7CE"
   ),

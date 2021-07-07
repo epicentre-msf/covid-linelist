@@ -154,3 +154,14 @@ rerun everything) and contact Anais.
 run the implementation script.
 
 Get date from 148 to code 168
+
+# Notes on mapping other linelists
+
+I need to derive new variables
+
+121
+
+138 chunk: mutate the new variable manually : extra\_...
+
+dict_extra_vars: check that the variable does not exists already, and
+register the new variable(s).
