@@ -34,6 +34,12 @@ OCA Bengladesh files are still protected, you need to unprotect them
 *D:\\MSF\\GRP-EPI-COVID-19 -
 NCoVEpi\\data-raw\\linelist-other\\OCA\\BGD*
 
+## Herat
+
+Move the last file from the sharepoint
+
+[<https://msfintl.sharepoint.com/:f:/r/sites/grp-epi-proj-covid-19-afg/Shared%20Documents/Epi/02_surveillance_data/triage_HRH_IDP?csf=1&web=1&e=UReAbx>](https://msfintl.sharepoint.com/:f:/r/sites/grp-epi-proj-covid-19-afg/Shared%20Documents/Epi/02_surveillance_data/triage_HRH_IDP?csf=1&web=1&e=UReAbx "https://msfintl.sharepoint.com/:f:/r/sites/grp-epi-proj-covid-19-afg/shared%20documents/epi/02_surveillance_data/triage_hrh_idp?csf=1&web=1&e=ureabx")
+
 # Compilation
 
 Now, files are going to live in *D:*\MSF\GRP*-EPI-COVID-19 -
