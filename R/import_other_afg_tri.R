@@ -24,7 +24,24 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     filter(date < as.Date("2021-01-04")) %>%  # 2021-01-04+ in newer file
     select(-date)
   
-  # latest file 2021+
+  
+  # last file before switch in July 2021
+  # (actually the limit date is 27 june, but we received files with
+  # the patients until the 6 july)
+  file_ll_2021_june <- llutils::list_files(
+    path = file.path(path_linelist_other, "OCP", "AFG"),
+    pattern = "2021_07_06.*\\.xlsx",
+    full.names = TRUE,
+    select = "latest"
+  )
+  
+  d_orig_june_2021 <- import_afg_tri_helper(file_ll_2021_june) %>% 
+    mutate(date = parse_dates(gregorian_date)) %>% 
+    filter(date <= as.Date("2021-06-27")) %>%  # 2021-06-27+ in newer file
+    select(-date)
+  
+  
+  # latest file 2021 july+ 
   file_ll_latest <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "\\.xlsx",
@@ -33,7 +50,8 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   )
   
   d_orig <- import_afg_tri_helper(file_ll_latest) %>% 
-    bind_rows(d_orig_old)
+    bind_rows(d_orig_old) %>% 
+    bind_rows(d_orig_june_2021)
   
   site_meta <- data.frame(
     msf_facitity = c("hrh", "idp", "c", "hrh ward"),
@@ -64,7 +82,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   d_derived <- d_orig %>% 
     # site metadata
     mutate(msf_facitity = tolower(msf_facitity)) %>% 
-    left_join(site_meta, by = "msf_facitity") %>% 
+    left_join(site_meta, by = "msf_facitity") %>%
     # add various constants
     mutate(
       report_country = "AFG",
@@ -75,8 +93,8 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       MSF_visit_type = "First consultation"
     ) %>% 
     # derive MSF_admin_location_past_week
-    mutate(across(province:city_village_idp_camp, ~ ifelse(is.na(.x), "", .x))) %>% 
-    unite("MSF_admin_location_past_week", province:city_village_idp_camp, sep = " | ") %>% 
+    mutate(across(province:district, ~ ifelse(is.na(.x), "", .x))) %>%
+    unite("MSF_admin_location_past_week", province:district, sep = " | ") %>% 
     # derive patcourse_asymp
     mutate(patcourse_asymp = case_when(
       tolower(does_the_patient_have_symptoms) == "yes" ~ "No",
@@ -86,6 +104,7 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     # derive Comcond_immuno
     mutate(
       across(c(hiv_status, other_immunodeficiency, malignancy_cancer), tolower),
+      hiv_status = if_else(hiv_status == "nknown", "unknown", hiv_status),
       hiv_status = if_else(hiv_status == "no", "negative", hiv_status)
     ) %>% 
     mutate(Comcond_immuno = case_when(
@@ -94,6 +113,8 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       is.na(hiv_status) & is.na(other_immunodeficiency) & is.na(malignancy_cancer) ~ NA_character_,
       TRUE ~ "Unknown"
     )) %>% 
+    mutate(
+      if_positive_on_arv  = if_else(if_positive_on_arv == "nknown", "unknown", if_positive_on_arv )) %>% 
     # derive MSF_hiv_status
     mutate(
       across(if_positive_on_arv, tolower),
@@ -106,7 +127,9 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       )
     ) %>% 
     # derive MSF_covid_status
-    mutate(across(c(previous_test_result, lab_result, category_according_to_clinical_examination, sent_for_testing), tolower)) %>% 
+    mutate(across(c(previous_test_result, lab_result, 
+                    category_according_to_clinical_examination, 
+                    sent_for_testing), tolower)) %>% 
     mutate(category_according_to_clinical_examination = if_else(category_according_to_clinical_examination == "non recorded", NA_character_, category_according_to_clinical_examination)) %>% 
     mutate(previous_test_result = recode(previous_test_result, "pasitive" = "positive")) %>% 
     mutate(MSF_covid_status = case_when(
