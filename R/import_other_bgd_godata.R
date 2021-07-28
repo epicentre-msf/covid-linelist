@@ -259,7 +259,8 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
                    "site",
                    "uid",
                    "MSF_N_Patient",
-                   "patient_id")
+                   "patient_id", 
+                   "nationality")
   
   ## import and prepare
   df_data <- d_out %>% 

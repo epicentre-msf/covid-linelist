@@ -122,7 +122,7 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", NA))
   test_set_equal(d_orig$msf_specific_outcome, c("other", "transferred", "sent back home", "lama", NA))
-  test_set_equal(d_orig$complications, c("Currently_on_treatment", NA))
+  test_set_equal(d_orig$complications_800bfaba_a2ac_43b0_8034_2a73d4dd711d, c("Currently_on_treatment", NA))
   
 
   ### Derived variables
@@ -187,10 +187,10 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     mutate(
       l_complicat = purrr::pmap(
         list(
-          complications, complications_1, complications_2, complications_3,
-          complications_4, complications_5, complications_6, complications_7,
-          complications_8, complications_9, complications_10, complications_11,
-          complications_12, please_specify_other_complications
+          complications_800bfaba_a2ac_43b0_8034_2a73d4dd711d, complications_1_complication, complications_2_complication, complications_3_complication,
+          complications_4_complication, complications_5_complication, complications_6_complication, complications_7_complication,
+          complications_8_complication, complications_9_complication, complications_10_complication, complications_11_complication,
+          complications_12_complication, please_specify_other_complications
         ),
         collapse_unique
       ),
@@ -250,7 +250,8 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
                    "site",
                    "uid",
                    "MSF_N_Patient",
-                   "patient_id")
+                   "patient_id", 
+                   "nationality")
   
   ## import and prepare
   df_data <- d_out %>% 
