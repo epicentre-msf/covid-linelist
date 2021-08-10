@@ -183,6 +183,8 @@ purrr::walk(
 
 
 ### Geocoding routines
+# source("R/zzz.R") # in case of update to dictionaries
+
 ll_geocode <- purrr::map_dfr(
   countries_update,
   clean_geo,
@@ -195,7 +197,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("IND"))
+# View(fetch_georef("AFG"))
 
 
 # check again for missing values among important columns
@@ -298,9 +300,16 @@ d_global_his <- d_global %>%
 OC_list <- unique(d_global_his$OC)
 OC_list <- OC_list[!grepl("/", OC_list)]
 
+# list(d_global_write, ll_cleaned, ll_geocode, 
+#     ll_import_epicentre, ll_other_afg_tri) %>% 
+#   map(rm)
+
+# memory.limit()
+# gc(full = TRUE)
 
 if (FALSE) {
   for (OC_focal in OC_list) {
+    OC_focal
     file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
     
     # account for sites run by 2+ OCs
