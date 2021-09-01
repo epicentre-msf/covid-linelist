@@ -14,7 +14,7 @@ source("R/indicators.R")
 
 # focal country ISO code
 # (update to include countries in linelist-other)
-countries_update <- sort(unique(c(countries, "BEL")))
+countries_update <- sort(unique(c(countries, "BEL", "TUN")))
 
 
 ### Import MSF Intersectional linelists
@@ -52,6 +52,7 @@ source("R/import_other_ind_ocb.R") # newest export requires new mapping template
 source("R/import_other_irq_ocb.R")
 source("R/import_other_jor_ocp.R")
 source("R/import_other_pak_ocb.R")
+source("R/import_other_tun_ocb.R")
 source("R/import_other_yem_ocb_moh.R") # still using MoH version for now
 source("R/import_other_yem_ocp.R")
 source("R/import_other_yem_pra.R")
@@ -73,12 +74,12 @@ ll_other_jor_ocp_1 <- import_other_jor_ocp(path_linelist_other, dict_linelist, d
 ll_other_jor_ocp_2 <- import_other_jor_ocp(path_linelist_other, dict_linelist)
 ll_other_jor_ocp <- import_other_jor_ocp(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
+ll_other_tun_ocb <- import_other_tun_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # still using MoH version for now
 ll_other_yem_ocp <- import_other_yem_ocp(path_linelist_other, dict_linelist) # one date problem
 ll_other_yem_pra <- import_other_yem_pra(path_linelist_other, dict_linelist)
 ll_other_bgd_godata <- import_other_bgd_godata(path_linelist_other, dict_linelist, exclude = id_oca_bgd_intersect)
 ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other, dict_linelist) # Always problems. If too bad, omit the file.
-
 
 ### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
@@ -97,6 +98,7 @@ ll_import <- dplyr::bind_rows(
   ll_other_jor_ocp_1,
   ll_other_jor_ocp_2,
   ll_other_pak_ocb,
+  ll_other_tun_ocb,
   ll_other_yem_ocb,
   ll_other_yem_ocp,
   ll_other_yem_pra,
@@ -125,7 +127,6 @@ llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
 
 
 # save raw country-specific RDS files
-
 if (!dir.exists("local")) dir.create("local")
 if (!dir.exists("local/clean")) dir.create("local/clean")
 if (!dir.exists("local/final")) dir.create("local/final")
@@ -164,7 +165,6 @@ ll_cleaned <- ll_import %>%
   )
 
 
-
 matchmaker::check_df(
   ll_cleaned,
   dict_factors,
@@ -197,7 +197,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("AFG"))
+# View(fetch_georef("VEN"))
 
 
 # check again for missing values among important columns
