@@ -309,11 +309,12 @@ import_go_data_ <- function(path, site) {
     na = c("", "NA"),
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>%
-    janitor::remove_empty("rows")
+    janitor::remove_empty("rows") %>% 
+    setNames(gsub(" +\\[MV 1\\]$", "", names(.)))
   
   # remove WHO CRF entries for OCA, which overlap with data in intersectional LL
   if (site %in% c("BGD_A_KUT", "BGD_A_BAL")) {
-    d <- d %>% 
+    d <- d %>%
       filter(!is.na(`_Health Facility`))
   }
     
