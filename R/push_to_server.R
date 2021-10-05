@@ -15,8 +15,10 @@ date_max <- get_prev_sunday(Sys.Date())
 data_dir <- here::here("local")
 if (!dir.exists(data_dir)) dir.create(data_dir)
 
-# Connect to local DB
-con <- DBI::dbConnect(RSQLite::SQLite(), here::here("local", "linelist.db"))
+# Create a fresh local db, delete only one if exists
+db_file <- here::here("local", "linelist.db")
+if (file.exists(db_file)) file.remove(db_file)
+con <- DBI::dbConnect(RSQLite::SQLite(), db_file)
 
 # import latest linelist compilation
 df_linelist <- get_linelist_data(shrpnt_path, date_max)
@@ -56,12 +58,12 @@ df_combined <- df_linelist %>%
 DBI::dbWriteTable(con, "combined", df_combined, overwrite = TRUE)
 
 # disconnect from DB
+# DBI::dbExecute(con, "VACUUM;")
 DBI::dbDisconnect(con)
 
 # run this to send data to server
 if (FALSE) {
   # send local database to server with rsync 
-  db_file <- here::here("local", "linelist.db")
   host <- "epicentre@vps709766.ovh.net"
   server_path <- "/home/epicentre/covid-linelist-dashboard"
   system2("rsync", args = c(db_file, paste(host, fs::path(server_path, "data"), sep = ":")))

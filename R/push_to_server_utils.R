@@ -27,6 +27,7 @@ get_linelist_data <- function(shrpnt_path, date_max) {
   
   df_linelist <- readr::read_rds(path) %>% 
     mutate_at(vars(contains("date")), lubridate::as_date) %>% 
+    mutate(epi_week_event = lubridate::floor_date(date_event, unit = "week", week_start = 1), .after = date_event) %>%
     mutate(
       patcourse_presHCF = lubridate::as_date(patcourse_presHCF),
       outcome_patcourse_presHCF = lubridate::as_date(outcome_patcourse_presHCF),
