@@ -122,7 +122,7 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", NA))
   test_set_equal(d_orig$msf_specific_outcome, c("other", "transferred", "sent back home", "lama", NA))
-  test_set_equal(d_orig$complications_800bfaba_a2ac_43b0_8034_2a73d4dd711d, c("Currently_on_treatment", NA))
+  # test_set_equal(d_orig$complications_800bfaba_a2ac_43b0_8034_2a73d4dd711d, c("Currently_on_treatment", NA))
   
 
   ### Derived variables
@@ -146,14 +146,14 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   d_derive <- d_orig %>% 
     # patinfo_ageonset (if both ages 0, should be NA?)
     mutate(patinfo_ageonset = case_when(
-      age_age_years == "0" & age_age_months == "0" ~ NA_character_,
-      age_age_months == "0" ~ age_age_years,
-      age_age_years == "0" ~ age_age_months
+      age_years == "0" & age_months == "0" ~ NA_character_,
+      age_months == "0" ~ age_years,
+      age_years == "0" ~ age_months
     )) %>% 
     mutate(patinfo_ageonsetunit = case_when(
-      age_age_years == "0" & age_age_months == "0" ~ NA_character_,
-      age_age_months == "0" ~ "Year",
-      age_age_years == "0" ~ "Month"
+      age_years == "0" & age_months == "0" ~ NA_character_,
+      age_months == "0" ~ "Year",
+      age_years == "0" ~ "Month"
     )) %>% 
     # derive MSF_admin_location_past_week
     mutate(across(addresses_location_1_location_geographical_level_3, ~ ifelse(is.na(.x), "", .x))) %>%
@@ -187,10 +187,10 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     mutate(
       l_complicat = purrr::pmap(
         list(
-          complications_800bfaba_a2ac_43b0_8034_2a73d4dd711d, complications_1_complication, complications_2_complication, complications_3_complication,
-          complications_4_complication, complications_5_complication, complications_6_complication, complications_7_complication,
-          complications_8_complication, complications_9_complication, complications_10_complication, complications_11_complication,
-          complications_12_complication, please_specify_other_complications
+          # complications_800bfaba_a2ac_43b0_8034_2a73d4dd711d, complications_1_complication, complications_2_complication, complications_3_complication,
+          # complications_4_complication, complications_5_complication, complications_6_complication, complications_7_complication,
+          # complications_8_complication, complications_9_complication, complications_10_complication, complications_11_complication,
+          complications, please_specify_other_complications
         ),
         collapse_unique
       ),
@@ -198,11 +198,13 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
       MSF_other_complications = map_chr(l_complicat, extract_other_comp)
     ) %>% 
     # outcome_asymp
-    mutate(outcome_asymp = case_when(
-      patient_asymptomatic == "Yes" ~ "No",
-      patient_asymptomatic == "No" ~ "Yes",
-      TRUE ~ patient_asymptomatic
-    )) %>% 
+    mutate(
+      outcome_asymp = dplyr::case_when(
+        patient_asymptomatic == "Yes" ~ "No",
+        patient_asymptomatic == "No" ~ "Yes",
+        TRUE ~ patient_asymptomatic
+      )
+    ) %>% 
     # outcome_patcourse_presHCF
     mutate(outcome_patcourse_presHCF = latest_adm_date) %>% 
     # outcome_patcourse_status
@@ -295,13 +297,19 @@ import_go_data_ <- function(path, site) {
     na = c("", "NA"),
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>%
-    janitor::remove_empty("rows")
+    janitor::remove_empty("rows") %>% 
+    select(-matches("\\[MV 1\\] [2-9]")) %>% 
+    setNames(gsub(" +\\[MV 1\\]( \\d)*$", "", names(.)))
   
   # remove WHO CRF entries for OCA, which overlap with data in intersectional LL
   if (site %in% c("BGD_A_KUT", "BGD_A_BAL")) {
     d <- d %>% 
       filter(!is.na(`_Health Facility`))
   }
+  
+  # remove duplicated column "Type" and "Type [MV 1]"
+  d <- d[,!(names(d) %in% "Type" & vapply(d, function(x) all(is.na(x)), FALSE))]
+  
     
   d %>% 
     mutate(linelist_row = 1:n(),

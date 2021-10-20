@@ -17,7 +17,6 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   library(rlang)
   source("R/import_other_bgd_godata.R")
   
-  
   ## site metadata
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
@@ -116,13 +115,19 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
     )
 
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$on_treatment, c("Currently_on_treatment", "Currently no treatment", NA))
+  test_set_equal(
+    d_orig$on_treatment,
+    c("Currently_on_treatment", "Currently no treatment", NA)
+  )
   test_set_equal(
     d_orig$msf_specific_outcome,
-    c("other", "transferred", "sent back home", "lama", "admitted", "others", "ktp", "quarrentine", "not recovered", NA)
+    c(
+      "other", "transferred", "sent back home", "lama", "admitted", "others", "ktp", "quarrentine", "not recovered",
+      "not-recovered", "left against medical advice", "reecovered", "death", "recovered", "healthy", NA
+    )
   )
   
-
+  
   ### Derived variables
   ## same as date_of_current_visit?
   latest_adm_date <- d_orig %>% 
@@ -137,23 +142,23 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   
   extra__secondary_comcond_at_discharge <- d_orig %>% 
     select(starts_with("secondary_co_morbidities_at_discharge")) %>% 
-    pmap_chr(., collapse_unique, to_chr =  TRUE) %>% 
+    purrr::pmap_chr(., collapse_unique, to_chr =  TRUE) %>% 
     dplyr::na_if("NA")
   
   d_derive <- d_orig %>% 
     # patinfo_ageonset (if both ages 0, should be NA?)
     mutate(
       patinfo_ageonset = case_when(
-        age_age_years == "0" & age_age_months == "0" ~ NA_character_,
-        age_age_months == "0" ~ age_age_years,
-        age_age_years == "0" ~ age_age_months
+        age_years == "0" & age_months == "0" ~ NA_character_,
+        age_months == "0" ~ age_years,
+        age_years == "0" ~ age_months
       )
     ) %>% 
     mutate(
       patinfo_ageonsetunit = case_when(
-        age_age_years == "0" & age_age_months == "0" ~ NA_character_,
-        age_age_months == "0" ~ "Year",
-        age_age_years == "0" ~ "Month"
+        age_years == "0" & age_months == "0" ~ NA_character_,
+        age_months == "0" ~ "Year",
+        age_years == "0" ~ "Month"
       )
     ) %>% 
     # derive MSF_admin_location_past_week
@@ -219,10 +224,12 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
       outcome_patcourse_status = case_when(
         outcome == "Deceased" ~ "Died",
         outcome == "Recovered" ~ "Cured",
+        tolower(msf_specific_outcome) %in% c("reecovered", "recovered") ~ "Cured",
+        tolower(msf_specific_outcome) %in% c("death") ~ "Died",
         is.na(msf_specific_outcome) & !outcome %in% c("Deceased", "Recovered") ~ "Other",
-        tolower(msf_specific_outcome) == "lama" ~ "Left against medical advice",
-        tolower(msf_specific_outcome) %in% "admitted" ~ "Other",
-        tolower(msf_specific_outcome) %in% c("others", "quarrentine", "ktp", "not recovered") ~ "Other", # ???
+        tolower(msf_specific_outcome) %in% c("lama", "left against medical advice") ~ "Left against medical advice",
+        tolower(msf_specific_outcome) %in% ("admitted") ~ "Other",
+        tolower(msf_specific_outcome) %in% c("others", "quarrentine", "ktp", "not recovered", "not-recovered", "healthy") ~ "Other", # ???
         TRUE ~ msf_specific_outcome
       )
     ) %>% 
@@ -269,9 +276,6 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, exclude 
   
   ## import and prepare
   df_data <- d_out %>% 
-    # group_by(site) %>% 
-    # mutate(linelist_row = 1:n()) %>% 
-    # ungroup() %>% 
     mutate(patient_id = paste(site, format_text(MSF_N_Patient), sep = "_")) %>% 
     mutate(db_row = 1:n()) %>% 
     mutate(linelist_lang = "English",
@@ -310,14 +314,12 @@ import_go_data_ <- function(path, site) {
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>%
     janitor::remove_empty("rows") %>% 
-    setNames(gsub(" +\\[MV 1\\]$", "", names(.)))
+    select(-matches("\\[MV 1\\] [2-9]")) %>% 
+    setNames(gsub(" +\\[MV 1\\]( \\d)*$", "", names(.)))
   
-  # remove WHO CRF entries for OCA, which overlap with data in intersectional LL
-  if (site %in% c("BGD_A_KUT", "BGD_A_BAL")) {
-    d <- d %>%
-      filter(!is.na(`_Health Facility`))
-  }
-    
+  # remove duplicated column "Type" and "Type [MV 1]"
+  d <- d[,!(names(d) %in% "Type" & vapply(d, function(x) all(is.na(x)), FALSE))]
+  
   d %>% 
     mutate(linelist_row = 1:n(),
            upload_date = as.character(llutils::extract_date(path)),
