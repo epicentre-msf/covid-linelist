@@ -210,9 +210,9 @@ clean_linelist <- function(dat,
     group_by(db_row, patient_id, variable) %>% 
     summarize(flag = paste(unique(flag), collapse = "; "), .groups = "keep") %>% 
     ungroup()
-
+  
   dates_check <- dat_date %>% 
-    mutate(flag_future = ifelse(date > lubridate::today(), "flag_future", NA_character_),
+    mutate(flag_future = ifelse(date > (lubridate::today() + 1), "flag_future", NA_character_),
            flag_too_early = ifelse(date < as.Date("2020-02-01"), "flag_too_early", NA_character_)) %>% 
     left_join(dat_date_flags, by = c("db_row", "patient_id", "variable")) %>%
     tidyr::unite("flag", flag_ambiguous, flag_too_early, flag_future, flag, na.rm = TRUE, sep = "; ") %>% 
