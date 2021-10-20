@@ -26,8 +26,8 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   
   
   # last file before switch in July 2021
-  # (actually the limit date is 27 june, but we received files with
-  # the patients until the 6 july)
+  # (actually the limit date is 27 June, but we received files with
+  # the patients until the 6 July)
   file_ll_2021_june <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "2021_07_06.*\\.xlsx",
@@ -69,8 +69,8 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   ### Check for unseen values in derivation variables
   test_set_equal(d_orig$msf_facitity, c("hrh", "idp", "c", "hrh ward"))
   test_set_equal(d_orig$does_the_patient_have_symptoms, c("yes", "no", "unknown", "non recorded", NA))
-  test_set_equal(d_orig$hiv_status, c("positive", "negative", "no", "unknown", NA))
-  test_set_equal(d_orig$if_positive_on_arv, c("yes", "no", "unknown", NA))
+  test_set_equal(d_orig$hiv_status, c("positive", "negative", "no", "nknown", "unknown", NA))
+  test_set_equal(d_orig$if_positive_on_arv, c("yes", "no", "nknown", "unknown", NA))
   test_set_equal(d_orig$previous_test_result, c("pasitive", "positive", "negative", "unknown", NA))
   test_set_equal(d_orig$lab_result, c("indeterminate", NA))
   test_set_equal(d_orig$category_according_to_clinical_examination, c("critical", "severe", "moderate", "mild", "not a suspect", "non recorded", NA))
@@ -96,27 +96,28 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
     mutate(across(province:district, ~ ifelse(is.na(.x), "", .x))) %>%
     unite("MSF_admin_location_past_week", province:district, sep = " | ") %>% 
     # derive patcourse_asymp
-    mutate(patcourse_asymp = case_when(
-      tolower(does_the_patient_have_symptoms) == "yes" ~ "No",
-      tolower(does_the_patient_have_symptoms) == "no" ~ "Yes",
-      tolower(does_the_patient_have_symptoms) == "unknown" ~ "Unknown"
-    )) %>% 
+    mutate(
+      patcourse_asymp = case_when(
+        tolower(does_the_patient_have_symptoms) == "yes" ~ "No",
+        tolower(does_the_patient_have_symptoms) == "no" ~ "Yes",
+        tolower(does_the_patient_have_symptoms) == "unknown" ~ "Unknown"
+      )
+    ) %>% 
     # derive Comcond_immuno
     mutate(
       across(c(hiv_status, other_immunodeficiency, malignancy_cancer), tolower),
       hiv_status = if_else(hiv_status == "nknown", "unknown", hiv_status),
-      hiv_status = if_else(hiv_status == "no", "negative", hiv_status)
+      hiv_status = if_else(hiv_status == "no", "negative", hiv_status),
+      Comcond_immuno = case_when(
+        hiv_status == "positive" | other_immunodeficiency == "yes" | malignancy_cancer == "yes" ~ "Yes",
+        hiv_status == "negative" & other_immunodeficiency == "no" & malignancy_cancer == "no" ~ "No",
+        is.na(hiv_status) & is.na(other_immunodeficiency) & is.na(malignancy_cancer) ~ NA_character_,
+        TRUE ~ "Unknown"
+      )
     ) %>% 
-    mutate(Comcond_immuno = case_when(
-      hiv_status == "positive" | other_immunodeficiency == "yes" | malignancy_cancer == "yes" ~ "Yes",
-      hiv_status == "negative" & other_immunodeficiency == "no" & malignancy_cancer == "no" ~ "No",
-      is.na(hiv_status) & is.na(other_immunodeficiency) & is.na(malignancy_cancer) ~ NA_character_,
-      TRUE ~ "Unknown"
-    )) %>% 
-    mutate(
-      if_positive_on_arv  = if_else(if_positive_on_arv == "nknown", "unknown", if_positive_on_arv )) %>% 
     # derive MSF_hiv_status
     mutate(
+      if_positive_on_arv  = if_else(if_positive_on_arv == "nknown", "unknown", if_positive_on_arv),
       across(if_positive_on_arv, tolower),
       MSF_hiv_status = case_when(
         hiv_status == "positive" & if_positive_on_arv == "yes" ~ "Positive (on ARV)",
@@ -127,20 +128,25 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
       )
     ) %>% 
     # derive MSF_covid_status
-    mutate(across(c(previous_test_result, lab_result, 
-                    category_according_to_clinical_examination, 
-                    sent_for_testing), tolower)) %>% 
-    mutate(category_according_to_clinical_examination = if_else(category_according_to_clinical_examination == "non recorded", NA_character_, category_according_to_clinical_examination)) %>% 
-    mutate(previous_test_result = recode(previous_test_result, "pasitive" = "positive")) %>% 
-    mutate(MSF_covid_status = case_when(
-      previous_test_result == "positive" | lab_result == "positive"	~ "Confirmed",
-      category_according_to_clinical_examination %in% c("mild", "moderate", "severe", "critical") & sent_for_testing == "yes" ~ "Suspected",
-      category_according_to_clinical_examination %in% c("mild", "moderate", "severe", "critical") & !sent_for_testing %in% "yes" ~ "Probable",
-      category_according_to_clinical_examination == "not a suspect"	~ "Not a suspect"
-      # if lab_result negative should they be "Not a case"?
-    )) %>% 
-    # derive MSF_refer_to
     mutate(
+      across(
+        c(previous_test_result, lab_result, category_according_to_clinical_examination, sent_for_testing),
+        tolower
+      ),
+      category_according_to_clinical_examination = if_else(
+        category_according_to_clinical_examination == "non recorded",
+        NA_character_,
+        category_according_to_clinical_examination
+        ),
+      previous_test_result = recode(previous_test_result, "pasitive" = "positive"),
+      MSF_covid_status = case_when(
+        previous_test_result == "positive" | lab_result == "positive"	~ "Confirmed",
+        category_according_to_clinical_examination %in% c("mild", "moderate", "severe", "critical") & sent_for_testing == "yes" ~ "Suspected",
+        category_according_to_clinical_examination %in% c("mild", "moderate", "severe", "critical") & !sent_for_testing %in% "yes" ~ "Probable",
+        category_according_to_clinical_examination == "not a suspect"	~ "Not a suspect"
+        # if lab_result negative should they be "Not a case"?
+      ),
+      # derive MSF_refer_to
       MSF_refer_to = ifelse(referral == "Other:", if_other, referral),
       MSF_refer_to = ifelse(tolower(MSF_refer_to) == "not suspected", NA_character_, MSF_refer_to)
     )
