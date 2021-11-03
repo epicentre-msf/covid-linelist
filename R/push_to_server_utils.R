@@ -108,18 +108,22 @@ get_agg_data <- function(shrpnt_path, date_max) {
 get_ocba_agg_data <- function(shrpnt_path, date_max) {
   ocba_dir <- fs::path(shrpnt_path, "coordination", "Surveillance focal points coordination", "Aggregated reporting", "OCBA")
   
-  data_dict <- read_csv(fs::path(ocba_dir, "Dict_OU.csv")) %>% janitor::clean_names() 
+  data_dict <- readr::read_csv(fs::path(ocba_dir, "Dict_OU.csv"), show_col_types = FALSE) %>%
+    janitor::clean_names() 
   # data_dict <- read_csv("data-raw/ocba_dict.csv") %>% janitor::remove_empty("cols") 
   # write_csv(data_dict, path(ocba_dir, "Dict_OU.csv"))
   
   latest_data_path <- max(fs::dir_ls(ocba_dir, regexp = "COVID19_AG"))
-  df_agg_ocba <- read_csv(latest_data_path) %>% 
+  
+  df_agg_ocba <- readr::read_csv(latest_data_path, show_col_types = FALSE) %>% 
     janitor::clean_names() %>% 
-    mutate(status = case_when(
-      str_detect(data, "confirmed") ~ "Confirmed",
-      str_detect(data, "suspected") ~ "Suspected",
-      TRUE ~ "Unknown"
-    )) %>% 
+    mutate(
+      status = case_when(
+        str_detect(data, "confirmed") ~ "Confirmed",
+        str_detect(data, "suspected") ~ "Suspected",
+        TRUE ~ "Unknown"
+      )
+    ) %>% 
     add_count(period, data, organisation_unit, wt = value, name = "Total") %>% 
     pivot_wider(names_from = "status", values_from = "value", values_fill = 0) %>% 
     filter(Total > 0) %>% 
@@ -131,7 +135,7 @@ get_ocba_agg_data <- function(shrpnt_path, date_max) {
     ) %>% 
     select(-period, -year, -week, -data) %>% 
     rename(site_name = organisation_unit) %>% 
-    left_join(select(data_dict, country = country_code_iso3, site_name = organisation_unit_level_4)) %>% 
+    left_join(select(data_dict, country = country_code_iso3, site_name = organisation_unit_level_4), by = "site_name") %>% 
     mutate(
       continent = countrycode::countrycode(country, "iso3c", "continent"),
       # flag = countrycode::countrycode(country, "iso3c", "unicode.symbol"),
@@ -139,7 +143,8 @@ get_ocba_agg_data <- function(shrpnt_path, date_max) {
       country_lab = dplyr::case_when(
         country_lab == "Congo - Kinshasa" ~ "Democratic Republic of the Congo", 
         country_lab == "Congo - Brazzaville" ~ "Republic of Congo",
-        TRUE ~ country_lab),
+        TRUE ~ country_lab
+      ),
       OC = "OCBA",
       site_name = paste(stringr::str_trim(site_name), "(*)"), 
       .before = 1

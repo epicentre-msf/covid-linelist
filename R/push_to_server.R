@@ -39,7 +39,7 @@ df_combined <- df_linelist %>%
     country_lab = dplyr::case_when(country_lab == "Bangladesh Camp" ~ "Bangladesh", TRUE ~ country_lab)
   ) %>% 
   group_by_all() %>% 
-  summarise(n = n()) %>% 
+  summarise(n = n(), .groups = "keep") %>% 
   add_tally(wt = n, name = "Total") %>% 
   ungroup() %>% 
   tidyr::spread(MSF_covid_status, n, fill = 0) %>% 
