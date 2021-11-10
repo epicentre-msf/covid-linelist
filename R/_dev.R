@@ -119,7 +119,6 @@ queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE)
 # check for patient_id dropped since previous compilation
 # known issues:
 # - ETH_E_GRH (use patient names as IDs)
-# - MWI_P_QCH (missing 30 IDs)
 llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
   readRDS() %>%
   anti_join(ll_import, by = c("site", "MSF_N_Patient")) %>%
@@ -197,14 +196,14 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("VEN"))
+# View(fetch_georef("IND"))
 
 
 # check again for missing values among important columns
 queryr::query(ll_geocode, is.na(site), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_geocode, is.na(patient_id), cols_base = c(country, OC), count = TRUE)
-queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, site), count = TRUE) %>% count(site)
+queryr::query(ll_geocode, duplicated(patient_id), cols_base = c(country, OC, site), count = TRUE) %>% count(site) %>% filter(n > 5)
 
 
 # Make sure this works!!! (needed later)
@@ -309,7 +308,6 @@ OC_list <- OC_list[!grepl("/", OC_list)]
 
 if (FALSE) {
   for (OC_focal in OC_list) {
-    OC_focal
     file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
     
     # account for sites run by 2+ OCs
@@ -319,12 +317,12 @@ if (FALSE) {
     # HIS-export
     d_oc_his <- filter(d_global_his, OC %in% OC_focal_sub)
     path_out1_oc <- file.path(path_export, OC_focal, file_out_oc)
-    llutils::write_simple_xlsx(d_oc_his, path_out1_oc)
+    writexl::write_xlsx(d_oc_his, path_out1_oc)
 
     # focal point
     d_oc_foc <- filter(d_global, OC %in% OC_focal_sub)
     path_out2_oc <- file.path(path_export_fp, OC_focal, file_out_oc)
-    llutils::write_simple_xlsx(d_oc_foc, path_out2_oc)
+    writexl::write_xlsx(d_oc_foc, path_out2_oc)
     
     # patient_id losses
     ### update to compare across HIS exports, not HIS export to global (no rm of duplicates)
