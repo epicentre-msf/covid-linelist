@@ -24,7 +24,7 @@ clean_linelist <- function(dat,
                            dict_factors_correct,
                            dict_countries_correct,
                            write_checks) {
-
+  
   ## requires
   library(dplyr, warn.conflicts = FALSE)
   library(tidyr, warn.conflicts = FALSE)
@@ -36,19 +36,24 @@ clean_linelist <- function(dat,
 
   ## if running manually
   if (FALSE) {
-    dat <- ll_import
-    write_checks <- TRUE
+    # dat <- ll_import
+    dat <- ll_cleaned
+    write_checks <- FALSE
   }
   
   #### Create temporary IDs if otherwise missing -------------------------------
   dat <- dat %>% 
     group_by(site) %>% 
-    mutate(temp_MSF_N_Patient = paste0("TEMPID_", formatC(1:n(), width = 3, flag = "0")),
-           temp_patient_id = paste(site, format_text(temp_MSF_N_Patient), sep = "_")) %>% 
+    mutate(
+      temp_MSF_N_Patient = paste0("TEMPID_", formatC(1:n(), width = 3, flag = "0")),
+      temp_patient_id = paste(site, format_text(temp_MSF_N_Patient), sep = "_")
+    ) %>% 
     ungroup() %>% 
-    mutate(temp_update_ids = is.na(MSF_N_Patient)) %>% 
-    mutate(MSF_N_Patient = ifelse(temp_update_ids, temp_MSF_N_Patient, MSF_N_Patient),
-           patient_id = ifelse(temp_update_ids, temp_patient_id, patient_id)) %>% 
+    mutate(
+      temp_update_ids = is.na(MSF_N_Patient),
+      MSF_N_Patient = ifelse(temp_update_ids, temp_MSF_N_Patient, MSF_N_Patient),
+      patient_id = ifelse(temp_update_ids, temp_patient_id, patient_id)
+    ) %>% 
     select(-temp_update_ids, -temp_MSF_N_Patient, -temp_patient_id)
   
   #### Clean numeric variables -------------------------------------------------
@@ -336,7 +341,12 @@ clean_linelist <- function(dat,
                     "expo_travel_country3")
   
   dat_countries_clean <- dat_factors_english %>%
-    matchmaker::match_df(dict_countries_correct)
+    matchmaker::match_df(
+      filter(dict_countries_correct, !is.na(replacement1)), ### bug when there is NA in replacement col
+      from = "value1",
+      to = "replacement1",
+      by = "variable1"
+    )
   
   check_countries <- queryr::query(
     dat_countries_clean, !.x %in% c(dict_countries$iso, NA_character_),
