@@ -411,18 +411,6 @@ check_files_to_dict <- function(path) {
 }
 
 
-create_empty_dict_dates <- function() {
-  tibble::tibble(
-    patient_id = character(0),
-    variable = character(0),
-    value = character(0),
-    date = as.Date(character(0)),
-    flag = character(0),
-    ignore = logical(0)
-  )
-}
-
-
 fetch_georef <- function(iso, path = path_shapefiles) {
   readRDS(file.path(path_shapefiles, iso, glue::glue("adm_reference_{iso}.rds")))
 }

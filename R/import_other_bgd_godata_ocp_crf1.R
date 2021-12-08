@@ -9,7 +9,7 @@
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist, exclude = NULL) {
+import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist, vars_date, exclude = NULL) {
   
   ## requires
   library(dplyr)
@@ -276,7 +276,7 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   
   # dates
   df_data <- df_data %>% 
-    mutate(across(any_of(date_vars), ~ as.character(as.Date(.x))))
+    mutate(across(any_of(vars_date), ~ as.character(as.Date(.x))))
   
   # exclude
   if (!is.null(exclude)) {

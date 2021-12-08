@@ -17,10 +17,10 @@
 clean_linelist <- function(dat,
                            path_dictionaries,
                            path_corrections_dates,
-                           date_vars,
+                           vars_date,
                            dict_factors,
                            dict_countries,
-                           dict_numeric_correct,
+                           corr_numeric,
                            dict_factors_correct,
                            dict_countries_correct,
                            write_checks) {
@@ -31,6 +31,7 @@ clean_linelist <- function(dat,
   library(glue, warn.conflicts = FALSE)
   library(llutils, warn.conflicts = FALSE)
   library(matchmaker, warn.conflicts = FALSE)
+  library(dbc, warn.conflicts = FALSE)
   source("R/clean.R")
   source("R/utilities.R")
 
@@ -74,189 +75,105 @@ clean_linelist <- function(dat,
   
   if (length(comcond_bad) > 0) {
     dat$Comcond_present <- comcond_n
-    # message("The following values of Comcond_present will be re-calculated: ",
-    #         paste(unique(comcond_bad), collapse = "; "))
   }
   
-  ## prepare dictionary
-  dict_numeric_prep <- dict_numeric_correct %>% 
-    mutate_at(vars(patient_id, variable, value), as.character) %>% 
-    mutate(replacement = if_else(replacement == ".na", NA_character_, replacement)) %>% 
-    mutate_at(vars(replacement), as.numeric) %>% 
-    mutate(replace = TRUE) %>% 
-    select(-new)
+  ## Clean all other numeric variables
+  vars_num <- c(
+    "patinfo_ageonset",
+    "MSF_delay_before_admission",
+    "MSF_length_stay",
+    "Comcond_present",
+    "outcome_contacts_followed"
+  )
   
-  ## gather numeric variables, convert to numeric, and apply dictionary
-  dat_numeric <- dat %>%
-    select(
-      db_row,
-      patient_id,
-      patinfo_ageonset,
-      MSF_delay_before_admission,
-      MSF_length_stay,
-      Comcond_present,
-      outcome_contacts_followed
-    ) %>% 
-    tidyr::gather(variable, value, -db_row, -patient_id) %>%
-    mutate(value_numeric = suppressWarnings(as.numeric(value))) %>% 
-    left_join(dict_numeric_prep, by = c("patient_id", "variable", "value")) %>% 
-    mutate(replace = ifelse(is.na(replace), FALSE, replace)) %>% 
-    mutate(value_numeric = ifelse(replace, replacement, value_numeric)) %>% 
-    select(-replacement) %>% 
-    mutate(
-      flag = case_when(
-        !is.na(value) & is.na(value_numeric) & !replace ~ TRUE,
-        variable %in% c("patinfo_ageonset", "outcome_contacts_followed") & value_numeric < 0 ~ TRUE,
-        variable %in% c("patinfo_ageonset", "outcome_contacts_followed") & value_numeric > 110 ~ TRUE,
-        TRUE ~ FALSE
-      )
-    )
+  corr_numeric_update <- dbc::check_numeric(
+    dat,
+    vars = vars_num,
+    vars_id = "patient_id",
+    queries = list(
+      patinfo_ageonset < 0,
+      outcome_contacts_followed < 0,
+      patinfo_ageonset > 110,
+      outcome_contacts_followed > 100
+    ),
+    dict_clean = corr_numeric,
+    return_all = TRUE
+  )
   
-  ## check for non-missing values not converted to numeric
-  if (any(dat_numeric$flag)) {
-
-    ## archive current dictionary
-    file_out_archive <- glue::glue("dict_numeric_correct_{time_stamp()}.xlsx")
+  if (any(corr_numeric_update$new %in% TRUE)) {
     
-    llutils::write_simple_xlsx(
-      dict_numeric_correct,
-      file = file.path(path_dictionaries, "archive", file_out_archive)
+    # archive correction old file
+    qxl::qxl(
+      corr_numeric,
+      file = file.path(path_corrections, "archive", glue::glue("corr_numeric_{time_stamp()}.xlsx"))
     )
     
-    ## update dictionary
-    check_numeric_append <- dat_numeric %>%
-      filter(flag) %>% 
-      select(patient_id, variable, value) %>% 
-      mutate(replacement = NA_character_, new = "Yes")
-    
-    dict_numeric_correct_out <- dict_numeric_correct %>% 
-      mutate(new = NA_character_) %>% 
-      bind_rows(check_numeric_append)
-    
-    llutils::write_simple_xlsx(
-      dict_numeric_correct_out,
-      file = file.path(path_dictionaries, glue("dict_numeric_correct.xlsx"))
+    # update corr_numeric.xlsx
+    qxl::qxl(
+      corr_numeric_update,
+      file = file.path(path_corrections, "corr_numeric.xlsx"),
+      style1 = qxl::qstyle(halign = "left")
     )
     
-    message(
-      nrow(check_numeric_append),
-      " new nonvalid values of numerical variables written to dict_numeric_correct"
-    )
+    message(sum(corr_numeric_update$new %in% TRUE), " new ambiguous numeric value(s) written to corr_numeric.xlsx")
   }
   
-  ## merge cleaned numeric columns back into dat_numeric
-  dat_numeric_clean <- dat_numeric %>%
-    select(-value, -replace, -flag) %>%
-    tidyr::spread(variable, value_numeric) %>% 
-    left_join_replace(x = dat, y = ., cols_match = c("db_row", "patient_id"))
+  dat_numeric_clean <- dbc::clean_numeric(
+    dat,
+    vars = vars_num,
+    vars_id = "patient_id",
+    dict_clean = corr_numeric
+  )
+  
   
   #### Clean date variables ----------------------------------------------------
   
   ## assemble dictionary for date variables
-  check_files <- list.files(
+  corr_dates <- list.files(
     path_corrections_dates,
     pattern = "^dates_check_compiled.*\\.xlsx",
     full.names = TRUE
-  )
+  ) %>% 
+    purrr::map_dfr(readxl::read_xlsx, col_types = "text") %>%
+    filter(!is.na(date_correct)) %>% 
+    distinct(patient_id, variable, value, replacement = date_correct)
   
-  dict_dates_full <- purrr::map_dfr(check_files, check_files_to_dict)
-  
-  if (nrow(dict_dates_full) == 0) dict_dates_full <- create_empty_dict_dates()
-  # TODO: fix problem with prev-changed vars getting ignore in new queries
-  dict_dates_ignore <- filter(dict_dates_full, ignore)
-  
-  dict_dates <- dict_dates_full %>% 
-    filter(!ignore) %>% 
-    select(-flag, -ignore) %>% 
-    unique()
-  
-  ## gather date columns
-  dat_date <- dat_numeric_clean %>%
-    select(db_row, patient_id, all_of(date_vars)) %>%
-    tidyr::gather(variable, value, -db_row, -patient_id) %>%
-    arrange(db_row, patient_id) %>% 
-    mutate(date = suppressWarnings(parse_excel_dates(value)),
-           date = suppressWarnings(parse_other_dates(date)),
-           date = as.Date(date))
-  
-  dat_date <- dat_date %>% 
-    llutils::recode_conditional(dict = dict_dates, col_recode = "date", flag_recoded = TRUE) %>% 
-    mutate(flag_ambiguous = ifelse(!date_is_recoded & !is.na(value) & is.na(date), "flag_ambiguous", NA)) %>% 
-    select(-date_is_recoded)
-  
-
-  #### Other date-logic checks -------------------------------------------------
-  
-  # define flag-variable mappings
-  df_flags <- tibble(
-    flag = c(
-      rep("flag_upload_before_report", 2),
-      rep("flag_outcome_before_consult", 2)
+  corr_dates_update <- dbc::check_dates(
+    dat_numeric_clean,
+    vars = vars_date,
+    vars_id = "patient_id",
+    queries = list(
+      .x > Sys.Date() + 1L,
+      .x < as.Date("2020-02-01"),
+      upload_date < report_date,
+      as.numeric(outcome_date_of_outcome - MSF_date_consultation) < -5
     ),
-    variable = c(
-      "upload_date", "report_date",
-      "outcome_date_of_outcome", "MSF_date_consultation"
-    ),
-    value = TRUE, check_date = TRUE
-  )
+    dict_clean = corr_dates,
+    populate_na = TRUE
+  ) %>% 
+    filter(!is.na(value))
   
-  dat_date_flags <- dat_date %>%
-    select(-value, -flag_ambiguous) %>%
-    tidyr::spread(variable, date) %>% 
-    mutate(
-      flag_upload_before_report = upload_date < report_date,
-      flag_outcome_before_consult = as.numeric(outcome_date_of_outcome - MSF_date_consultation) < -5,
-    ) %>% 
-    select(db_row, patient_id, starts_with("flag")) %>% 
-    tidyr::gather(flag, value, -db_row, -patient_id) %>% 
-    mutate(value = ifelse(!value, NA, value)) %>% 
-    left_join(df_flags, by = c("flag", "value")) %>% 
-    filter(value) %>% 
-    group_by(db_row, patient_id, variable) %>% 
-    summarize(flag = paste(unique(flag), collapse = "; "), .groups = "keep") %>% 
-    ungroup()
-  
-  dates_check <- dat_date %>% 
-    mutate(flag_future = ifelse(date > (lubridate::today() + 1), "flag_future", NA_character_),
-           flag_too_early = ifelse(date < as.Date("2020-02-01"), "flag_too_early", NA_character_)) %>% 
-    left_join(dat_date_flags, by = c("db_row", "patient_id", "variable")) %>%
-    tidyr::unite("flag", flag_ambiguous, flag_too_early, flag_future, flag, na.rm = TRUE, sep = "; ") %>% 
-    mutate(flag = ifelse(flag == "", NA_character_, gsub("flag_", "", flag))) %>% 
-    anti_join(dict_dates_ignore, by = c("patient_id", "variable", "flag")) %>% 
-    group_by(db_row, patient_id) %>% 
-    mutate(check = any(!is.na(flag))) %>% 
-    ungroup() %>% 
-    filter(check) %>% 
-    select(-check) %>% 
-    filter(!is.na(value) | !is.na(date)) %>% 
-    arrange(db_row, date) %>% 
-    mutate(date = as.character(date),
-           date_correct = NA_character_,
-           comment = NA_character_) %>% 
-    mutate(date_correct = ifelse(flag == "ambiguous", ".na", NA_character_)) %>% 
-    select(patient_id, variable, value, date, date_correct, flag, comment)
-  
-
-  ## check for non-missing values not converted to date
-  if (nrow(dates_check) > 0 & write_checks) {
+  if (any(!is.na(corr_dates_update$query)) & write_checks) {
     
-    llutils::write_simple_xlsx(
-      dates_check,
-      file = file.path(path_corrections_dates, glue("dates_check_compiled_{time_stamp()}.xlsx")),
-      group = patient_id
-    )
+    corr_dates_update %>% 
+      rename(date_correct = replacement, flag = query) %>% 
+      mutate(comment = NA_character_) %>% 
+      qxl::qxl(
+        file = file.path(path_corrections_dates, glue("dates_check_compiled_{time_stamp()}.xlsx")),
+        style1 = qxl::qstyle(halign = "left"),
+        group = "patient_id"
+      )
     
-    nambig <- sum(!is.na(dates_check$flag), na.rm = TRUE)
-    message(paste(nambig, "date problems written to file"))
+    message(sum(!is.na(corr_dates_update$query)), " new date problems written to file")
   }
   
-  
-  ## merge cleaned date columns back into dat
-  dat_dates_clean <- dat_date %>%
-    select(-value, -flag_ambiguous) %>%
-    tidyr::spread(variable, date) %>% 
-    left_join_replace(x = dat_numeric_clean, y = ., cols_match = c("db_row", "patient_id")) %>% 
-    # recalculate date diffs
+  dat_dates_clean <- dbc::clean_dates(
+    dat_numeric_clean,
+    vars = vars_date,
+    vars_id = "patient_id",
+    dict_clean = corr_dates
+  ) %>% 
+    # recalculate after date corrections (if any)
     mutate(
       MSF_length_stay = as.numeric(outcome_date_of_outcome - MSF_date_consultation),
       MSF_delay_before_admission = as.numeric(MSF_date_consultation - patcourse_dateonset)

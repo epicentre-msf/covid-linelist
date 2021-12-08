@@ -10,6 +10,7 @@ library(glue, warn.conflicts = FALSE)
 library(matchmaker, warn.conflicts = FALSE)    # remotes::install_github("patrickbarks/matchmaker")
 library(hmatch, warn.conflicts = FALSE)        # remotes::install_github("epicentre-msf/hmatch")
 library(llutils, warn.conflicts = FALSE)       # remotes::install_github("epicentre-msf/llutils")
+library(dbc, warn.conflicts = FALSE)           # remotes::install_github("epicentre-msf/dbc")
 source("R/utilities.R")
 
 
@@ -66,10 +67,12 @@ dict_factors <- read_xlsx(file.path(path_dictionaries, "dict_factors.xlsx"))
 dict_countries <- read_xlsx(path_dict_countries)
 dict_extra_vars <- read_xlsx(file.path(path_dictionaries, "dict_extra_vars.xlsx"))
 dict_date_categories <- read_xlsx(file.path(path_dictionaries, "dict_date_categories.xlsx"))
-dict_numeric_correct <- read_xlsx(file.path(path_dictionaries, "dict_numeric_correct.xlsx"))
+
+corr_numeric <- read_xlsx(file.path(path_corrections, "corr_numeric.xlsx"))
 dict_factors_correct <- read_xlsx(file.path(path_dictionaries, "dict_factors_correct.xlsx"))
 dict_countries_correct <- read_xlsx(file.path(path_dictionaries, "dict_countries_correct.xlsx"))
-date_vars <- c("upload_date", dict_linelist$code_name[dict_linelist$data_type == "Date"])
+
+vars_date <- c("upload_date", dict_linelist$code_name[dict_linelist$data_type == "Date"])
 
 
 ### Vector of ISO3 country codes for which we have linelists in data-raw

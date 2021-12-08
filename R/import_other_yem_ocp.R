@@ -11,7 +11,7 @@
 #' linelist version for each facility, with minor cleaning (e.g. removing
 #' almost-empty lines) and standardizing (e.g. variable names)
 #' 
-import_other_yem_ocp <- function(path_linelist_other, dict_linelist) {
+import_other_yem_ocp <- function(path_linelist_other, dict_linelist, vars_date) {
   
   ## requires
   library(dplyr)
@@ -35,7 +35,7 @@ import_other_yem_ocp <- function(path_linelist_other, dict_linelist) {
     select = "latest"
   )
   
-  date_vars_convert <- date_vars[!date_vars %in% "upload_date"]
+  date_vars_convert <- vars_date[!vars_date %in% "upload_date"]
   
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
