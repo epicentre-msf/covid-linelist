@@ -151,7 +151,10 @@ clean_linelist <- function(dat,
     dict_clean = corr_dates,
     populate_na = TRUE
   ) %>% 
-    filter(!is.na(value))
+    filter(!is.na(value)) %>% 
+    group_by(patient_id) %>% 
+    arrange(date) %>% 
+    ungroup()
   
   if (any(!is.na(corr_dates_update$query)) & write_checks) {
     
