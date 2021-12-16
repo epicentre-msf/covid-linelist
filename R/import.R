@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "SYR"
+    country <- "CAF"
     site_exclude <- NULL
   }
   
@@ -125,6 +125,11 @@ import_linelists <- function(country,
       ## avoid duplicate patients IDs with prev non-intersect. linelist for YEM_P_SAN
       MSF_N_Patient = case_when(
         site %in% "YEM_P_SAN" ~ paste0("N00", MSF_N_Patient),
+        TRUE ~ MSF_N_Patient
+      ),
+      ## avoid duplicate patients IDs with prev intersect. linelist for CAF_E_BAT
+      MSF_N_Patient = case_when(
+        site %in% "CAF_E_BAT" & lubridate::as_date(upload_date) > as.Date("2021-12-01") ~ paste0("LL2_", MSF_N_Patient),
         TRUE ~ MSF_N_Patient
       )
     ) %>% 
