@@ -11,47 +11,57 @@ import_other_afg_tri <- function(path_linelist_other, dict_linelist) {
   ### Read linelist
   
   # last file before switch to new 2021 file
-  file_ll_2020 <- llutils::list_files(
+  file_ll_1 <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "2021_01_17.*\\.xlsx",
     full.names = TRUE,
     select = "latest"
   )
   
-  d_orig_old <- import_afg_tri_helper(file_ll_2020, skip = 1) %>% 
+  d_orig_1 <- import_afg_tri_helper(file_ll_1, skip = 1) %>% 
     rename(if_other = if_other_63) %>%  # rename to match 2021-01-26+ files
-    mutate(date = parse_dates(gregorian_date)) %>% 
-    filter(date < as.Date("2021-01-04")) %>%  # 2021-01-04+ in newer file
-    select(-date)
-  
+    filter(parse_dates(gregorian_date) < as.Date("2021-01-04")) # 2021-01-04+ in newer file
   
   # last file before switch in July 2021
   # (actually the limit date is 27 June, but we received files with
   # the patients until the 6 July)
-  file_ll_2021_june <- llutils::list_files(
+  file_ll_2 <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "2021_07_06.*\\.xlsx",
     full.names = TRUE,
     select = "latest"
   )
   
-  d_orig_june_2021 <- import_afg_tri_helper(file_ll_2021_june) %>% 
-    mutate(date = parse_dates(gregorian_date)) %>% 
-    filter(date <= as.Date("2021-06-27")) %>%  # 2021-06-27+ in newer file
-    select(-date)
+  d_orig_2 <- import_afg_tri_helper(file_ll_2) %>% 
+    filter(parse_dates(gregorian_date) <= as.Date("2021-06-27"))  # 2021-06-27+ in newer file
   
+  # July 2021 - Jan 2, 2022 
+  file_ll_3 <- llutils::list_files(
+    path = file.path(path_linelist_other, "OCP", "AFG"),
+    pattern = "2022_01_09.*\\.xlsx",
+    full.names = TRUE,
+    select = "latest"
+  )
   
-  # latest file 2021 july+ 
-  file_ll_latest <- llutils::list_files(
+  d_orig_3 <- import_afg_tri_helper(file_ll_3)
+  
+  # 2022-01-03 - present
+  file_ll_4 <- llutils::list_files(
     path = file.path(path_linelist_other, "OCP", "AFG"),
     pattern = "\\.xlsx",
     full.names = TRUE,
     select = "latest"
   )
   
-  d_orig <- import_afg_tri_helper(file_ll_latest) %>% 
-    bind_rows(d_orig_old) %>% 
-    bind_rows(d_orig_june_2021)
+  d_orig_4 <- import_afg_tri_helper(file_ll_4)
+  
+  # combine all lls
+  d_orig <- dplyr::bind_rows(
+    d_orig_1,
+    d_orig_2,
+    d_orig_3,
+    d_orig_4
+  )
   
   site_meta <- data.frame(
     msf_facitity = c("hrh", "idp", "c", "hrh ward"),
