@@ -130,6 +130,7 @@ import_linelists <- function(country,
       ## avoid duplicate patients IDs with prev intersect. linelist for CAF_E_BAT
       MSF_N_Patient = case_when(
         site %in% "CAF_E_BAT" & lubridate::as_date(upload_date) > as.Date("2021-12-01") ~ paste0("LL2_", MSF_N_Patient),
+        site %in% "CAF_E_BAT" & lubridate::as_date(upload_date) > as.Date("2022-01-20") ~ paste0("LL3_", MSF_N_Patient),
         TRUE ~ MSF_N_Patient
       )
     ) %>% 
@@ -165,7 +166,7 @@ scan_sheets <- function(path_data_raw,
                         country,
                         dict_facilities,
                         return_latest = TRUE) {
-
+  
   ## requires
   library(dplyr, warn.conflicts = FALSE)
   library(tidyr, warn.conflicts = FALSE)
@@ -186,21 +187,23 @@ scan_sheets <- function(path_data_raw,
   reg_rm <- "^linelist_Covid_anonymous__|_\\d{2}-\\d{2}\\.xlsx$|\\.xlsx$"
   
   # variables to parse from file path
-  vars_parse <- c("country",
-                  "OC",
-                  "project",
-                  "site_type",
-                  "site_name",
-                  "key",
-                  "upload_date")
+  vars_parse <- c(
+    "country",
+    "OC",
+    "project",
+    "site_type",
+    "site_name",
+    "key",
+    "upload_date"
+  )
   
   ## prep dict_facilities for join
   dict_facilities_join <- dict_facilities %>% 
     filter(country == .env$country) %>%
     mutate_all(as.character) %>% 
-    mutate(split1 = lubridate::as_date(split1)) %>% 
+    mutate(across(matches("^split\\d"), lubridate::as_date)) %>% 
     mutate(site_name_join = format_text2(site_filename)) %>% 
-    select(site, source, country, shape, OC, project, site_name, uid,  site_name_join, split1)
+    select(site, source, country, shape, OC, project, site_name, uid,  site_name_join, split1, split2)
   
   # parse files and retain only most recent file by site
   df_sheet <- tibble::tibble(file_path = files_country) %>%
@@ -214,7 +217,13 @@ scan_sheets <- function(path_data_raw,
     left_join(dict_facilities_join, by = c("country", "OC", "site_name_join")) %>% 
     select(-site_name_join) %>% 
     mutate(file_path = file.path(path_data_raw_country, file_path)) %>% 
-    mutate(group = as.integer(lubridate::as_date(upload_date) > split1))
+    mutate(
+      group = case_when(
+        upload_date > split2 ~ 2L,
+        upload_date > split1 ~ 1L,
+        TRUE ~ 0L
+      )
+    )
   
   if (any(is.na(df_sheet$site))) {
     files_no_match <- unique(basename(df_sheet$file_path[is.na(df_sheet$site)]))
@@ -227,7 +236,7 @@ scan_sheets <- function(path_data_raw,
       arrange(desc(upload_date)) %>% 
       slice(1) %>%
       ungroup() %>% 
-      select(-any_of(c("split1", "group", "source")))
+      select(-any_of(c("split1", "split2", "group", "source")))
   }
  
   ## return

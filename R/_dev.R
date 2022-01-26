@@ -14,7 +14,7 @@ source("R/indicators.R")
 
 # focal country ISO code
 # (update to include countries in linelist-other)
-countries_update <- sort(unique(c(countries, "BEL", "TUN")))
+countries_update <- sort(unique(c(countries, "BEL", "MMR", "TUN")))
 
 
 ### Import MSF Intersectional linelists
@@ -45,12 +45,12 @@ source("R/import_other_bel_ocb_gal.R")
 source("R/import_other_bel_ocb_snk.R")
 source("R/import_other_bra_ocb.R")
 source("R/import_other_bra_ocp.R")
-source("R/import_other_cod_oca.R")
 source("R/import_other_cod_ocp.R")
 source("R/import_other_hti_ocb.R")
 source("R/import_other_ind_ocb.R") # newest export requires new mapping template
 source("R/import_other_irq_ocb.R")
 source("R/import_other_jor_ocp.R")
+source("R/import_other_mmr_oca.R")
 source("R/import_other_pak_ocb.R")
 source("R/import_other_tun_ocb.R")
 source("R/import_other_yem_ocb_moh.R") # still using MoH version for now
@@ -65,14 +65,13 @@ ll_other_bel_ocb_gal <- import_other_bel_ocb_gal(path_linelist_other, dict_linel
 ll_other_bel_ocb_snk <- import_other_bel_ocb_snk(path_linelist_other, dict_linelist)
 ll_other_bra_ocb <- import_other_bra_ocb(path_linelist_other, dict_linelist)
 ll_other_bra_ocp <- import_other_bra_ocp(path_linelist_other, dict_linelist)
-# ll_other_cod_oca <- import_other_cod_oca(path_linelist_other, dict_linelist) # new export to data-raw/COD seems to overlap and supersede
 ll_other_cod_ocp <- import_other_cod_ocp(path_linelist_other, dict_linelist)
 ll_other_hti_ocb <- import_other_hti_ocb(path_linelist_other, dict_linelist)
 ll_other_ind_ocb <- import_other_ind_ocb(path_linelist_other, dict_linelist)
 ll_other_irq_ocb <- import_other_irq_ocb(path_linelist_other, dict_linelist)
 ll_other_jor_ocp_1 <- import_other_jor_ocp(path_linelist_other, dict_linelist, date_cutoff = "2021-01-01")
 ll_other_jor_ocp_2 <- import_other_jor_ocp(path_linelist_other, dict_linelist)
-ll_other_jor_ocp <- import_other_jor_ocp(path_linelist_other, dict_linelist)
+ll_other_mmr_oca <- import_other_mmr_oca(path_linelist_other, dict_linelist)
 ll_other_pak_ocb <- import_other_pak_ocb(path_linelist_other, dict_linelist)
 ll_other_tun_ocb <- import_other_tun_ocb(path_linelist_other, dict_linelist)
 ll_other_yem_ocb <- import_other_yem_ocb(path_linelist_other, dict_linelist) # still using MoH version for now
@@ -91,13 +90,13 @@ ll_import <- dplyr::bind_rows(
   ll_other_bel_ocb_snk,
   ll_other_bra_ocb,
   ll_other_bra_ocp,
-  # ll_other_cod_oca,
   ll_other_cod_ocp,
   ll_other_hti_ocb,
   ll_other_ind_ocb,
   ll_other_irq_ocb,
   ll_other_jor_ocp_1,
   ll_other_jor_ocp_2,
+  ll_other_mmr_oca,
   ll_other_pak_ocb,
   ll_other_tun_ocb,
   ll_other_yem_ocb,
@@ -196,7 +195,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("VEN"))
+# View(fetch_georef("IND"))
 
 
 # check again for missing values among important columns
