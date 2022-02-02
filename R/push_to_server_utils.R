@@ -106,6 +106,7 @@ get_agg_data <- function(shrpnt_path, date_max) {
 }
 
 get_ocba_agg_data <- function(shrpnt_path, date_max) {
+  
   ocba_dir <- fs::path(shrpnt_path, "coordination", "Surveillance focal points coordination", "Aggregated reporting", "OCBA")
   
   data_dict <- readr::read_csv(fs::path(ocba_dir, "Dict_OU.csv"), show_col_types = FALSE) %>%
@@ -113,7 +114,7 @@ get_ocba_agg_data <- function(shrpnt_path, date_max) {
   # data_dict <- read_csv("data-raw/ocba_dict.csv") %>% janitor::remove_empty("cols") 
   # write_csv(data_dict, path(ocba_dir, "Dict_OU.csv"))
   
-  latest_data_path <- max(fs::dir_ls(ocba_dir, regexp = "COVID19_AG"))
+  latest_data_path <- max(list.files(ocba_dir, pattern = "^COVID19_AG", full.names = TRUE))
   
   df_agg_ocba <- readr::read_csv(latest_data_path, show_col_types = FALSE) %>% 
     janitor::clean_names() %>% 
