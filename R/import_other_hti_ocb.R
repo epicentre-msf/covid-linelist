@@ -17,12 +17,10 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   library(dplyr)
   library(hmatch)
   
-  
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
 
-  
   path_to_files <- file.path(path_linelist_other, "OCB", "HTI")
   
   df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_OCB_HTI.xlsx") %>% 
@@ -69,8 +67,8 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   
 
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$symptomatique, c("oui", "non", NA))
-  test_set_equal(d_orig$symptomatique_a_la_sortie,  c("oui", "non", "na, sympt. à l'admission", NA))
+  test_set_equal(d_orig$symptomatique, c("oui", "symptomatique", "non", NA))
+  test_set_equal(d_orig$symptomatique_a_la_sortie,  c("oui", "symptomatique à la sortie", "non", "na, sympt. à l'admission", NA))
   
   
   ### Derived variables
@@ -86,7 +84,7 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
     mutate(
       # note that outcome_asymp is asking 'Developed symptoms over the course of the disease?'
       outcome_asymp = case_when(
-        symptomatique %in% "oui" | symptomatique_a_la_sortie %in% "oui" ~ "Oui",
+        symptomatique %in% c("oui", "symptomatique") | symptomatique_a_la_sortie %in% c("oui", "symptomatique à la sortie") ~ "Oui",
         symptomatique %in% "non" | symptomatique_a_la_sortie %in% "non" ~ "Non"
       )
     )
@@ -98,21 +96,23 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
     dplyr::bind_cols(df_map_constant, .)
   
   ## derived columns
-  cols_derive <- c("db_row",
-                   "linelist_row",
-                   "upload_date",
-                   "linelist_lang",
-                   "linelist_vers",
-                   "country",
-                   "shape",
-                   "OC",
-                   "project",
-                   "site_type",
-                   "site_name",
-                   "site",
-                   "uid",
-                   "MSF_N_Patient",
-                   "patient_id")
+  cols_derive <- c(
+    "db_row",
+    "linelist_row",
+    "upload_date",
+    "linelist_lang",
+    "linelist_vers",
+    "country",
+    "shape",
+    "OC",
+    "project",
+    "site_type",
+    "site_name",
+    "site",
+    "uid",
+    "MSF_N_Patient",
+    "patient_id"
+  )
 
   ## import and prepare
   df_data <- d_out %>% 
@@ -142,11 +142,18 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
 
 import_hti_ocb_ <- function(path, site) {
   
+  if (FALSE) {
+    path <- files_ll[2]
+    site <- names(files_ll[2])
+  }
+  
+  skip_lines <- if_else(site == "HTI_B_MAR", 0, 1)
+  
   readxl::read_xlsx(
     path, 
     col_types = "text",
     na = c("", "NA"),
-    # skip = 3,
+    skip = skip_lines,
     .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
   ) %>% 
     janitor::clean_names() %>% 
