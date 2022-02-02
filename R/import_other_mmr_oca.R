@@ -20,7 +20,7 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
   
   path_to_files <- file.path(path_linelist_other, "OCA", "MMR")
   
-  df_map <- file.path(path_to_files, "LL_v3.1_mapping_dhis2_Myitkyina.xlsx") %>% 
+  df_map <- file.path(path_to_files, "LL_v3.1_mapping_dhis2_MMR.xlsx") %>% 
     readxl::read_xlsx() %>% 
     janitor::clean_names() %>% 
     select(1, 7, 8, 9, 10) %>% 
@@ -45,22 +45,35 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
   
-  files_ll <- llutils::list_files(
-    path_to_files,
-    pattern = "^LL_covid_dhis2_Myitkyina.*\\.xls",
-    select = "latest"
+  files_ll <- c(
+    MMR_A_HPA = llutils::list_files(
+      path_to_files,
+      pattern = "^LL_covid_dhis2_Hparkant.*\\.xls",
+      select = "latest"
+    ),
+    MMR_A_LSH = llutils::list_files(
+      path_to_files,
+      pattern = "^LL_covid_dhis2_Lashio.*\\.xls",
+      select = "latest"
+    ),
+    MMR_A_MYI = llutils::list_files(
+      path_to_files,
+      pattern = "^LL_covid_dhis2_Myitkyina.*\\.xls",
+      select = "latest"
+    ),
+    MMR_A_YNG = llutils::list_files(
+      path_to_files,
+      pattern = "^LL_covid_dhis2_Yangoon3.*\\.xls",
+      select = "latest"
+    )
   )
   
-  d_orig <- readxl::read_xls(files_ll, col_types = "text") %>% 
-    rename_with(hmatch::string_std) %>% 
-    janitor::remove_empty("rows") %>% 
-    mutate(
-      linelist_row = 1:n(),
-      upload_date = as.character(llutils::extract_date(files_ll)),
-      site = "MMR_A_MYI"
-    ) %>% 
+  d_orig <- purrr::map2_dfr(
+    files_ll,
+    names(files_ll),
+    import_mmr_oca_
+  ) %>% 
     dplyr::left_join(dict_facilities_join, by = "site")
-  
   
   ### Check for unseen values in derivation variables
   test_set_equal(
@@ -69,11 +82,23 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
   )
   test_set_equal(
     d_orig$confirmation_status_at_exit,
-    c(NA, "[sng] suspect (test negative)", "[pnd] probable (test not done)")
+    c(
+      NA,
+      "[cpv] confirmed case (test positive)",
+      "[pnd] probable (test not done)",
+      "[pin] probable (test inconclusive)",
+      "[sng] suspect (test negative)"
+    )
   )
   test_set_equal(
     d_orig$pregnant,
-    c("[y] yes, currently pregnant", "[na] not applicable", "[n] no", NA) 
+    c(
+      "[y] yes, currently pregnant",
+      "[n] no",
+      "[n] not currently or recently pregnant",
+      "[na] not applicable",
+      NA
+    )
   )
   test_set_equal(
     d_orig$malaria_rdt_at_admission,
@@ -93,6 +118,7 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
       NA,
       "[ot] other",
       "[rf] external msf referral / transfer",
+      "[tr] internal msf transfer",
       "[la] left against medical advice",
       "[dh] discharged home", "[dd] dead"
     )
@@ -102,32 +128,47 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
     c("[mam] moderate acute malnutrition", "[nm] not malnourished", NA)
   )
   
-  
-  # df_map_direct %>% 
-  #   filter(var_epi %in% dict_factors$variable)
-  # 
   # d_orig %>% 
   #   count(inpatient_exit_status)
   # 
-  # dict_factors %>% 
-  #   filter(variable == "outcome_patcourse_status") %>% 
-  #   select(1:2) %>% 
+  # dict_factors %>%
+  #   filter(variable == "MSF_covid_status") %>%
+  #   select(1:2) %>%
   #   print(n = "all")
+  
   
   ### Derived variables
   d_derive <- d_orig %>% 
     mutate(
       across(c(date_of_admission, date_of_exit), ~ as.character(lubridate::as_date(.x))),
+      patinfo_ageonsetunit = case_when(
+        !is.na(age_combined_in_years) ~ "Years"
+      ),
       patinfo_sex = case_when(
         sex %in% "[F] Female" ~ "F",
         sex %in% "[M] Male" ~ "M",
       ),
+      patinfo_idadmin1 = case_when(
+        site %in% "MMR_A_HPA" ~ "Kachin",
+        site %in% "MMR_A_LSH" ~ "Shan",
+        site %in% "MMR_A_MYI" ~ "Kachin",
+        site %in% "MMR_A_YNG" ~ "Yangoon"
+      ),
+      MSF_admin_location_past_week = case_when(
+        site %in% "MMR_A_HPA" ~ "Kachin",
+        site %in% "MMR_A_LSH" ~ "Shan",
+        site %in% "MMR_A_MYI" ~ "Kachin",
+        site %in% "MMR_A_YNG" ~ "Yangoon"
+      ),
       MSF_covid_status = case_when(
+        confirmation_status_at_exit %in% "[CPV] Confirmed case (test positive)" ~ "Confirmed",
+        confirmation_status_at_exit %in% "[PIN] Probable (test inconclusive)" ~ "Probable",
         confirmation_status_at_exit %in% "[PND] Probable (test not done)" ~ "Probable",
-        confirmation_status_at_exit %in% "[SNG] Suspect (test negative)" ~ "Suspected",
+        confirmation_status_at_exit %in% "[SNG] Suspect (test negative)" ~ "Suspected"
       ),
       Comcond_preg = case_when(
         pregnant %in% "[N] No" ~ "No",
+        pregnant %in% "[N] Not currently or recently pregnant" ~ "No",
         pregnant %in% "[NA] Not applicable" ~ NA_character_,
         pregnant %in% "[Y] Yes, currently pregnant" ~ "Yes"
       ),
@@ -153,24 +194,24 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
       ),
       outcome_patcourse_status = case_when(
         inpatient_exit_status %in% "[DD] Dead" ~ "Died",
-        inpatient_exit_status %in% "[DH] Discharged home" ~ "Cured",
+        inpatient_exit_status %in% "[DH] Discharged home" ~ "Sent back home",
         inpatient_exit_status %in% "[LA] Left against medical advice" ~ "Left against medical advice",
         inpatient_exit_status %in% "[OT] Other" ~ "Other",
+        inpatient_exit_status %in% "[TR] Internal MSF transfer" ~ "Transferred",
         inpatient_exit_status %in% "[RF] External MSF referral / transfer" ~ "Transferred"
       ),
       MSF_malnutrition = case_when(
         nutrition_status_at_admission %in% "[MAM] Moderate acute malnutrition" ~ "Yes",
         nutrition_status_at_admission %in% "[NM] Not malnourished" ~ "No",
+      ),
+      MSF_complications = case_when(
+        ards %in% "1" ~ "Acute respiratory distress syndrome (ARDS)",
+        renal_failure %in% "1" ~ "Renal distress",
+        shock %in% "1" ~ "Septic shock", ## mapping general to specific
+        sepsis %in% "1" ~ "Sepsis"
+        # thromboembolic_complications %in% "1" ~ "Deep vein thrombosis" ## mapping general to specific
       )
-      # MSF_complications = case_when(
-      #   ards %in% "1" ~ "Acute respiratory distress syndrome (ARDS)",
-      #   renal_failure %in% "1" ~ "Renal distress",
-      #   # cardiac_complications %in% "1" ~ "Heart failure", #???
-      #   shock %in% "1" ~ "Other", #???
-      #   sepsis %in% "1" ~ "Sepsis"
-      # )
     )
-  
   
   ### Constants and 1:1 mappings
   d_out <- d_derive %>% 
@@ -212,7 +253,7 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
     mutate(
       patient_id = paste(site, format_text(MSF_N_Patient), sep = "_"),
       db_row = 1:n(),
-      linelist_lang = ll_language,
+      linelist_lang = "English",
       linelist_vers = "Other"
     )
   
@@ -228,4 +269,20 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
   ## return
   dplyr::select(df_data, all_of(cols_derive), all_of(ll_template), starts_with("extra_"))
 }
- 
+
+
+
+import_mmr_oca_ <- function(path, site) {
+  readxl::read_xls(
+    path,
+    col_types = "text",
+    .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
+  ) %>% 
+    dplyr::rename_with(hmatch::string_std) %>% 
+    janitor::remove_empty("rows") %>% 
+    dplyr::mutate(
+      linelist_row = 1:n(),
+      upload_date = as.character(llutils::extract_date(path)),
+      site = site
+    )
+}
