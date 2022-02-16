@@ -67,8 +67,21 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
   
 
   ### Check for unseen values in derivation variables
-  test_set_equal(d_orig$symptomatique, c("oui", "symptomatique", "non", NA))
-  test_set_equal(d_orig$symptomatique_a_la_sortie,  c("oui", "symptomatique à la sortie", "non", "na, sympt. à l'admission", NA))
+  test_set_equal(
+    d_orig$symptomatique,
+    c("oui", "symptomatique", "non", NA)
+  )
+  test_set_equal(
+    d_orig$symptomatique_a_la_sortie, 
+    c(
+      "oui",
+      "symptomatique à la sortie",
+      "non",
+      "na, sympt. à l'admission",
+      "igu", ## ?
+      NA
+    )
+  )
   
   
   ### Derived variables
@@ -143,11 +156,12 @@ import_other_hti_ocb <- function(path_linelist_other, dict_linelist) {
 import_hti_ocb_ <- function(path, site) {
   
   if (FALSE) {
-    path <- files_ll[2]
-    site <- names(files_ll[2])
+    path <- files_ll[1]
+    site <- names(files_ll[1])
   }
   
-  skip_lines <- if_else(site == "HTI_B_MAR", 0, 1)
+  skip_lines <- 1
+  # skip_lines <- if_else(site == "HTI_B_MAR", 0, 1)
   
   readxl::read_xlsx(
     path, 
@@ -162,4 +176,5 @@ import_hti_ocb_ <- function(path, site) {
            upload_date = as.character(llutils::extract_date(path)),
            site = site)
 }
+
 
