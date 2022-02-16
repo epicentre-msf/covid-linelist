@@ -108,7 +108,7 @@ ll_import <- dplyr::bind_rows(
 
 
 # check for missing values among important columns
-queryr::query(ll_import, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE) # MWI has 30, not gonna change
+queryr::query(ll_import, is.na(MSF_N_Patient), cols_base = c(country, OC), count = TRUE)
 queryr::query(ll_import, is.na(site), cols_base = c(country, OC), count = TRUE) #!!!!
 queryr::query(ll_import, is.na(linelist_lang), cols_base = c(country, OC), count = TRUE) #!!
 queryr::query(ll_import, is.na(upload_date), cols_base = c(country, OC), count = TRUE)
@@ -121,6 +121,7 @@ queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE)
 # - ETH_E_GRH (use patient names as IDs)
 llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
   readRDS() %>%
+  filter(!grepl("TEMPID_", MSF_N_Patient)) %>% 
   anti_join(ll_import, by = c("site", "MSF_N_Patient")) %>%
   count(site)
 
@@ -173,7 +174,6 @@ matchmaker::check_df(
   always_allow_na = TRUE
 )
 
-
 purrr::walk(
   sort(unique(ll_cleaned$country)),
   write_by_country,
@@ -195,7 +195,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("IND"))
+# View(fetch_georef("YEM"))
 
 
 # check again for missing values among important columns
