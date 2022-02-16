@@ -130,7 +130,7 @@ import_linelists <- function(country,
       ## avoid duplicate patients IDs with prev intersect. linelist for CAF_E_BAT
       MSF_N_Patient = case_when(
         site %in% "CAF_E_BAT" & lubridate::as_date(upload_date) > as.Date("2021-12-01") ~ paste0("LL2_", MSF_N_Patient),
-        site %in% "CAF_E_BAT" & lubridate::as_date(upload_date) > as.Date("2022-01-20") ~ paste0("LL3_", MSF_N_Patient),
+        site %in% "CAF_E_BAT" & lubridate::as_date(upload_date) > as.Date("2022-01-23") ~ paste0("LL3_", MSF_N_Patient),
         TRUE ~ MSF_N_Patient
       )
     ) %>% 
