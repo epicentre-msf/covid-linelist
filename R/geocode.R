@@ -41,11 +41,13 @@ clean_geo <- function(country,
   adm_cols <- paste0("adm", 1:4, "_name__res")
   
   dat_geoclean_prep <- dat %>% 
-    tidyr::separate(MSF_admin_location_past_week,
-                    into = adm_cols,
-                    sep = "[[:space:]]*\\|[[:space:]]*",
-                    fill = "right",
-                    remove = FALSE) %>% 
+    tidyr::separate(
+      MSF_admin_location_past_week,
+      into = adm_cols,
+      sep = "[[:space:]]*\\|[[:space:]]*",
+      fill = "right",
+      remove = FALSE
+    ) %>% 
     select(all_of(col_order), matches("^adm[[:digit:]]_name")) %>% 
     mutate(across(all_of(adm_cols), ~ ifelse(.x == "", NA_character_, .x)))
   
@@ -95,7 +97,14 @@ clean_geo <- function(country,
         mutate(across(any_of(c("adm1", "adm2", "adm3", "adm4")), ~ stringr::str_squish(toupper(.x)))) %>% 
         select(-any_of(c("i", "new"))) %>% 
         unique() %>% 
-        select(starts_with("adm"), starts_with("ref"), any_of("pcode"), any_of("match_type"), starts_with("level"), everything())
+        select(
+          starts_with("adm"),
+          starts_with("ref"),
+          any_of("pcode"),
+          any_of("match_type"),
+          starts_with("level"),
+          everything()
+        )
     } else {
       df_manual_check_full <- tibble(
         adm1 = character(0),
@@ -129,7 +138,8 @@ clean_geo <- function(country,
       pattern = "^adm",
       dict = dict_recode,
       fuzzy = TRUE,
-      code_col = "pcode"
+      code_col = "pcode",
+      std_fn = function(x) hmatch::string_std(rm_arabic(x))
     ) %>% 
       select(-level) %>% 
       mutate_all(as.character)

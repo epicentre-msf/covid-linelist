@@ -53,10 +53,14 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 0, .name_repair = hmatch::string_std) %>% 
+  standardize_text <- function(x) {
+    hmatch::string_std(rm_arabic(x)) 
+  }
+  
+  d_orig <- readxl::read_xlsx(file_ll, col_types = "text", skip = 0, .name_repair = standardize_text) %>% 
     rename("Comcond_other" = "") %>%  # original variables has no English name
     janitor::remove_empty("rows") %>% 
-    # janitor::clean_names() %>% 
+    # janitor::clean_names() %>%
     mutate(site = "YEM_B_GAM") %>% 
     dplyr::left_join(dict_facilities_join, by = "site") %>% 
     mutate(upload_date = as.character(llutils::extract_date(file_ll)))
@@ -156,21 +160,23 @@ import_other_yem_ocb <- function(path_linelist_other, dict_linelist) {
     )
   
   ## derived columns
-  cols_derive <- c("db_row",
-                   "linelist_row",
-                   "upload_date",
-                   "linelist_lang",
-                   "linelist_vers",
-                   "country",
-                   "shape",
-                   "OC",
-                   "project",
-                   "site_type",
-                   "site_name",
-                   "site",
-                   "uid",
-                   "MSF_N_Patient",
-                   "patient_id")
+  cols_derive <- c(
+    "db_row",
+    "linelist_row",
+    "upload_date",
+    "linelist_lang",
+    "linelist_vers",
+    "country",
+    "shape",
+    "OC",
+    "project",
+    "site_type",
+    "site_name",
+    "site",
+    "uid",
+    "MSF_N_Patient",
+    "patient_id"
+  )
   
   ## import and prepare
   df_data <- d_out %>% 
