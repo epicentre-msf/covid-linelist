@@ -18,14 +18,14 @@ source("R/utilities.R")
 ### Set global paths
 path_onedrive <- switch(
   Sys.info()["user"],
-  "patrickbarks" = path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi"),
+  "patrickbarks" = path.expand("~/Library/CloudStorage/OneDrive-Bibliothèquespartagées-MSF/GRP-EPI-COVID-19 - NCoVEpi"),
   "M-MOUSSET"     = path.expand("D:/MSF/GRP-EPI-COVID-19 - NCoVEpi"),
   path.expand("~/MSF/GRP-EPI-COVID-19 - NCoVEpi")          # generic Mac path 
-  )
+)
 
 path_afg_triage <- switch(
   Sys.info()["user"],
-  "patrickbarks" = path.expand("~/MSF/GRP-EPI-PROJ-COVID-19-AFG - triage_HRH_IDP"),
+  "patrickbarks" = path.expand("~/Library/CloudStorage/OneDrive-Bibliothèquespartagées-MSF/GRP-EPI-PROJ-COVID-19-AFG - triage_HRH_IDP"),
   "M-MOUSSET"     = path.expand(""),                                   # Mathilde to edit
   path.expand("~/MSF/GRP-EPI-PROJ-COVID-19-AFG - triage_HRH_IDP")     # generic Mac path 
 )

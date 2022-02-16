@@ -8,7 +8,7 @@ get_os_root <- function() {
 }
 
 get_sharepoint_path <- function() {
-  fs::path(get_os_root(), "MSF", "GRP-EPI-COVID-19 - NCoVEpi")
+  fs::path(get_os_root(), "Library", "CloudStorage", "OneDrive-Bibliothèquespartagées-MSF", "GRP-EPI-COVID-19 - NCoVEpi")
 }
 
 get_prev_sunday <- function(date) {
