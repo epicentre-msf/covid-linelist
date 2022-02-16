@@ -164,7 +164,8 @@ clean_linelist <- function(dat,
       qxl::qxl(
         file = file.path(path_corrections_dates, glue("dates_check_compiled_{time_stamp()}.xlsx")),
         style1 = qxl::qstyle(halign = "left"),
-        group = "patient_id"
+        group = "patient_id",
+        col_widths = c(date = 10, comment = 30)
       )
     
     message(sum(!is.na(corr_dates_update$query)), " new date problems written to file")
