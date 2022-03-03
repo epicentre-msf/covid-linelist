@@ -1,29 +1,29 @@
 
 
-### Required libraries
+## Required libraries ----------------------------------------------------------
 library(tidyverse)
-library(lubridate)
+library(lubridate, warn.conflicts = FALSE)
 library(readxl)
-library(janitor)
-library(qxl)
+library(janitor, warn.conflicts = FALSE)
+library(qxl) # remotes::install_github("epicentre-msf/qxl")
 library(openxlsx)
 library(glue)
-library(llutils)
 source("R/zzz.R")
 source("R/utilities.R")
 
 
 ## Global analysis -------------------------------------------------------------
-dat_clean <- llutils::list_files(
+dat_clean <- list.files(
   path_export_global,
   pattern = "^msf_covid19_linelist_global_.*\\.rds",
-  full.names = TRUE,
-  select = "latest"
-) %>%
+  full.names = TRUE
+) %>% 
+  max() %>% # select most recent file
   readRDS() %>% 
   mutate(upload_date = as.character(upload_date)) %>% 
   mutate(site_name = if_else(site == "LBN_P_ELH", "Elias Hrawi Governmental Hospital", site_name)) %>% 
-  select(-c(MSF_name_surname, MSF_phone_number, MSF_phone_owner, MSF_comment))
+  select(-c(MSF_name_surname, MSF_phone_number, MSF_phone_owner, MSF_comment)) %>% 
+  filter(OC == "OCA", date_event < as.Date("2022-01-01")) ### if filtering to specific sites/OC
 
 dat_long <- dat_clean %>% 
   select(OC, country, site_name, any_of(dict_linelist$code_name)) %>% 
@@ -32,58 +32,67 @@ dat_long <- dat_clean %>%
 
 d_missing_site <- dat_long %>% 
   group_by(OC, country, site_name, name) %>% 
-  summarize(n_rows = n(),
-            n_known = sum(!value %in% c(NA, "Unknown")),
-            p_known = round(n_known / n_rows * 100, 0),
-            .groups = "drop") %>% 
+  summarize(
+    n_rows = n(),
+    n_known = sum(!value %in% c(NA, "Unknown")),
+    p_known = round(n_known / n_rows * 100, 0),
+    .groups = "drop"
+  ) %>% 
   select(-n_known)
 
 d_missing_oc <- dat_long %>%
   group_by(OC, name) %>%
-  summarize(n_rows = n(),
-            n_known = sum(!value %in% c(NA, "Unknown")),
-            p_known = round(n_known / n_rows * 100, 0),
-            .groups = "drop") %>%
+  summarize(
+    n_rows = n(),
+    n_known = sum(!value %in% c(NA, "Unknown")),
+    p_known = round(n_known / n_rows * 100, 0),
+    .groups = "drop"
+  ) %>%
   select(-n_known) %>%
   mutate(country = "ALL", site_name = "ALL", .after = 1)
 
 d_missing_total <- dat_long %>%
   group_by(name) %>%
-  summarize(n_rows = n(),
-            n_known = sum(!value %in% c(NA, "Unknown")),
-            p_known = round(n_known / n_rows * 100, 0),
-            .groups = "drop") %>%
+  summarize(
+    n_rows = n(),
+    n_known = sum(!value %in% c(NA, "Unknown")),
+    p_known = round(n_known / n_rows * 100, 0),
+    .groups = "drop"
+  ) %>%
   select(-n_known) %>%
   mutate(OC = "ALL", country = "ALL", site_name = "ALL", .before = 1)
 
-
 d_summary_site <- d_missing_site %>% 
-  tidyr::pivot_wider(id_cols = c(OC, country, site_name),
-                     names_from = name,
-                     values_from = p_known) %>% 
+  tidyr::pivot_wider(
+    id_cols = c(OC, country, site_name),
+    names_from = name,
+    values_from = p_known
+  ) %>% 
   arrange(OC, country, site_name) %>% 
   select(OC, country, site_name, any_of(dict_linelist$code_name))
 
 d_summary_OC <- d_missing_oc %>% 
-  tidyr::pivot_wider(id_cols = c(OC, country, site_name),
-                     names_from = name,
-                     values_from = p_known) %>% 
+  tidyr::pivot_wider(
+    id_cols = c(OC, country, site_name),
+    names_from = name,
+    values_from = p_known
+  ) %>% 
   arrange(OC, country, site_name) %>% 
   select(OC, country, site_name, any_of(dict_linelist$code_name))
 
 d_summary_total <- d_missing_total %>% 
-  tidyr::pivot_wider(id_cols = c(OC, country, site_name),
-                     names_from = name,
-                     values_from = p_known) %>% 
+  tidyr::pivot_wider(
+    id_cols = c(OC, country, site_name),
+    names_from = name,
+    values_from = p_known
+  ) %>% 
   arrange(OC, country, site_name) %>% 
   select(OC, country, site_name, any_of(dict_linelist$code_name))
 
 d_summary_full <- bind_rows(
   d_summary_total,
-  # tibble(OC = NA),
   d_summary_OC,
-  d_summary_site,
-  # tibble(OC = NA)
+  d_summary_site
 )
 
 df_site <- d_summary_full %>% 
@@ -95,22 +104,25 @@ var_labs <- file.path(path_dict_linelist, "LLcovid_var_dictionary_V3.0_Eng.xlsx"
   select(name = code_name, label = variable_short_label)
 
 d_summary_t <- d_summary_full %>% 
+  filter(!OC %in% "ALL") %>%  ### adjust if filtering to specific sites/OC
   tidyr::unite("site", OC:site_name, sep = "__") %>% 
+  mutate(site = gsub("__ALL__ALL$", "", site)) %>% 
   pivot_longer(cols = -site) %>% 
   pivot_wider(names_from = site, values_from = value) %>% 
   left_join(var_labs, by = "name") %>% 
-  relocate(label, .after = "name")
-
-# write
+  relocate(label, .after = "name") 
+  
+## write -----------------------------------------------------------------------
 wb <- qxl::qxl(
   d_summary_t,
   freeze_col = 2,
-  style_head = qstyle(rows = 1, cols = -c(name, label), textRotation = 90),
-  col_widths = c(40, 60, rep(4.2, ncol(d_summary_t)-2))
+  style_head = qxl::qstyle(rows = 1, cols = -c(name, label), textRotation = 90),
+  col_widths = c(name = 40, label = 60, .default = 4.2)
 )
 
 conditionalFormatting(
-  wb, 1,
+  wb,
+  1,
   cols = 3:ncol(d_summary_t),
   rows = 2:(nrow(d_summary_t)+1),
   type = "databar",
@@ -121,14 +133,13 @@ conditionalFormatting(
 suppressMessages(
   openxlsx::saveWorkbook(
     wb,
-    file = file.path(path_onedrive, "analyses", glue::glue("covid19_linelist_completeness_{Sys.Date()}.xlsx")),
+    file = file.path(path_onedrive, "analyses", glue::glue("covid19_linelist_completeness_OCA_{Sys.Date()}.xlsx")),
     overwrite = TRUE
   )
 )
 
 
-
-## Specific analysis for OCP ---------------------------------------------------
+#### Specific analysis for OCP -------------------------------------------------
 d_ocp <- dat_clean %>% 
   filter(OC == "OCP", country %in% c("AFG", "BGD", "YEM"))
 
