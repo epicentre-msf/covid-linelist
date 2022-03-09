@@ -157,6 +157,7 @@ ll_cleaned <- ll_import %>%
     path_dictionaries,
     path_corrections_dates,
     vars_date = vars_date,
+    vars_numeric = vars_numeric,
     dict_factors = dict_factors,
     dict_countries = dict_countries,
     corr_numeric = corr_numeric,
@@ -195,7 +196,7 @@ ll_geocode <- purrr::map_dfr(
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("YEM"))
+# View(fetch_georef("AFG"))
 
 
 # check again for missing values among important columns
@@ -238,7 +239,6 @@ d_global <- list.files(file.path("local", "final"), pattern = "msf_covid19_linel
     OC_OCP = ifelse(grepl("OCP", OC), TRUE, NA),
     .after = "OC"
   )
-
 
 # check for patient_id dropped since previous compilation (worry if big numbers)
 llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%

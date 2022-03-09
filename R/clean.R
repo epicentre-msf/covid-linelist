@@ -18,6 +18,7 @@ clean_linelist <- function(dat,
                            path_dictionaries,
                            path_corrections_dates,
                            vars_date,
+                           vars_numeric,
                            dict_factors,
                            dict_countries,
                            corr_numeric,
@@ -37,13 +38,13 @@ clean_linelist <- function(dat,
 
   ## if running manually
   if (FALSE) {
-    # dat <- ll_import
-    dat <- ll_cleaned
+    dat <- ll_import
+    # dat <- ll_cleaned
     write_checks <- FALSE
   }
   
   #### Create temporary IDs if otherwise missing -------------------------------
-  dat <- dat %>% 
+  dat_prep_id <- dat %>% 
     group_by(site) %>% 
     mutate(
       temp_MSF_N_Patient = paste0("TEMPID_", formatC(1:n(), width = 3, flag = "0")),
@@ -60,41 +61,44 @@ clean_linelist <- function(dat,
   #### Clean numeric variables -------------------------------------------------
   
   ## Recalculate Comcond_present
-  comcond_n <- dat %>% 
+  comcond_n <- dat_prep_id %>% 
     select(starts_with("Comcond"), -Comcond_present) %>% 
     mutate(Comcond_other = ifelse(!is.na(Comcond_other), "Yes", NA_character_)) %>% 
     apply(1, function(x) as.character(sum(tolower(x) %in% c('yes', 'oui', 'si', 'sim') & !is.na(x), na.rm = TRUE)))
   
-  comcond_missing <- dat %>% 
+  comcond_missing <- dat_prep_id %>% 
     select(starts_with("Comcond"), -Comcond_present) %>% 
     apply(1, function(x) all(tolower(x) %in% c('unknown', 'inconnu', 'no conocido', 'desconhecido') | is.na(x)))
   
   comcond_n[comcond_missing] <- NA_character_
   
-  comcond_bad <- dat$Comcond_present[!(is.na(dat$Comcond_present) & is.na(comcond_n) | dat$Comcond_present == comcond_n)]
+  comcond_bad <- dat_prep_id$Comcond_present[!(is.na(dat_prep_id$Comcond_present) & is.na(comcond_n) | dat_prep_id$Comcond_present == comcond_n)]
   
   if (length(comcond_bad) > 0) {
-    dat$Comcond_present <- comcond_n
+    dat_prep_id$Comcond_present <- comcond_n
   }
   
   ## Clean all other numeric variables
-  vars_num <- c(
-    "patinfo_ageonset",
-    "MSF_delay_before_admission",
-    "MSF_length_stay",
-    "Comcond_present",
-    "outcome_contacts_followed"
-  )
+  dat_numeric_prep <- dat_prep_id %>% 
+    mutate(
+      MSF_oxygen_saturation = gsub("\\%$", "", MSF_oxygen_saturation),
+      MSF_oxygen_saturation = as.numeric(MSF_oxygen_saturation),
+      MSF_oxygen_saturation = case_when(
+        MSF_oxygen_saturation < 1 ~ MSF_oxygen_saturation * 100,
+        TRUE ~ MSF_oxygen_saturation
+      )
+    )
   
   corr_numeric_update <- dbc::check_numeric(
-    dat,
-    vars = vars_num,
+    dat_numeric_prep,
+    vars = vars_numeric,
     vars_id = "patient_id",
     queries = list(
       patinfo_ageonset < 0,
       outcome_contacts_followed < 0,
       patinfo_ageonset > 110,
-      outcome_contacts_followed > 100
+      outcome_contacts_followed > 100,
+      MSF_oxygen_saturation > 100
     ),
     dict_clean = corr_numeric,
     return_all = TRUE
@@ -119,12 +123,12 @@ clean_linelist <- function(dat,
   }
   
   dat_numeric_clean <- dbc::clean_numeric(
-    dat,
-    vars = vars_num,
+    dat_numeric_prep,
+    vars = vars_numeric,
     vars_id = "patient_id",
     dict_clean = corr_numeric
   )
-  
+
   
   #### Clean date variables ----------------------------------------------------
   
