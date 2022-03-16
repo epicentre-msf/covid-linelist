@@ -90,7 +90,7 @@ import_other_yem_pra <- function(path_linelist_other, dict_linelist) {
 
 import_other_yem_pra_helper <- function(path) {
   
-  suppressMessages(readr::read_csv(path)) %>% 
+  readr::read_csv(path, show_col_types = FALSE, guess_max = 1e4) %>% 
     mutate_all(as.character) %>% 
     rename(
       country = Country,

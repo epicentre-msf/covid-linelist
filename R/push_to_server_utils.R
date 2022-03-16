@@ -26,7 +26,7 @@ get_linelist_data <- function(shrpnt_path, date_max) {
   age_labs <- c("0-4", "5-9", "10-14", "15-24", "25-34", "35-44", "45-54", "55-64", "65-74", "75+")
   
   df_linelist <- readr::read_rds(path) %>% 
-    mutate_at(vars(contains("date")), lubridate::as_date) %>% 
+    mutate_at(vars(matches("date(?!_event_source)", perl = TRUE)), lubridate::as_date) %>% 
     mutate(epi_week_event = lubridate::floor_date(date_event, unit = "week", week_start = 1), .after = date_event) %>%
     mutate(
       patcourse_presHCF = lubridate::as_date(patcourse_presHCF),
@@ -58,30 +58,53 @@ get_linelist_data <- function(shrpnt_path, date_max) {
 }
 
 get_agg_data <- function(shrpnt_path, date_max) {
-  path_agg_data <- file.path(shrpnt_path, "coordination", "Surveillance focal points coordination", "Aggregated reporting", "Report_covid_aggregate_all_v2.xlsx")
   
-  agg_data_names <- c("sheet", "OC", "country_lab", "project", "date", "week", "Suspected", "Probable", "Confirmed", "Not a case", "Unknown")
+  path_agg_data <- file.path(
+    shrpnt_path,
+    "coordination",
+    "Surveillance focal points coordination",
+    "Aggregated reporting",
+    "Report_covid_aggregate_all_v2.xlsx"
+  )
+  
+  agg_data_names <- c(
+    "sheet",
+    "OC",
+    "country_lab",
+    "project",
+    "date",
+    "week",
+    "Suspected",
+    "Probable",
+    "Confirmed",
+    "Not a case",
+    "Unknown"
+  )
   
   agg_sheets <- excel_sheets(path_agg_data)
   agg_sheets <- agg_sheets[!grepl("sheet", agg_sheets, ignore.case = TRUE)]
   
   df_weekly_aggregated <- agg_sheets %>% 
     setdiff(., c("ECU- Quito", "BGD - BD102")) %>% 
-    map_df(~{
-      print(.x)
-      oc      <- read_excel(path = path_agg_data, sheet = .x, range = "B1", col_names = FALSE) %>% pull()
-      country <- read_excel(path = path_agg_data, sheet = .x, range = "D1", col_names = FALSE) %>% pull()
-      project <- read_excel(path = path_agg_data, sheet = .x, range = "F1", col_names = FALSE) %>% pull()
-      
-      df <- read_excel(path = path_agg_data, sheet = .x, skip = 5, col_names = FALSE)
-      if(nrow(df) < 1) return(NULL)
-      
-      last_col <- ifelse(ncol(df) < 7, ncol(df), 7)
-      df %>% 
-        mutate(sheet = .x, OC = oc, country_lab = country, project = project) %>% 
-        select(sheet, OC, country_lab, project, 1:last_col)
-      
-    }) %>% 
+    map_df(
+      ~{
+        print(.x)
+        oc      <- read_excel(path = path_agg_data, sheet = .x, range = "B1", col_names = "OC") %>% pull()
+        country <- read_excel(path = path_agg_data, sheet = .x, range = "D1", col_names = "country") %>% pull()
+        project <- read_excel(path = path_agg_data, sheet = .x, range = "F1", col_names = "project") %>% pull()
+        
+        df <- suppressMessages(read_excel(path = path_agg_data, sheet = .x, skip = 5, col_names = FALSE)) %>% 
+          setNames(paste0('x', 1:ncol(.)))
+        
+        if (nrow(df) < 1) return(NULL)
+        
+        last_col <- ifelse(ncol(df) < 7, ncol(df), 7)
+        
+        df %>% 
+          mutate(sheet = .x, OC = oc, country_lab = country, project = project) %>% 
+          select(sheet, OC, country_lab, project, num_range("x", 1:7))
+      }
+    ) %>% 
     set_names(agg_data_names) %>% 
     tidyr::separate(sheet, into = c("country", "site_name"), sep = "-", extra = "merge") %>% 
     mutate(
