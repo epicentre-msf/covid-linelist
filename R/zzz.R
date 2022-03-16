@@ -61,7 +61,7 @@ path_linelist_other <- file.path(path_onedrive, "data-raw", "linelist-other")
 ### Read dictionaries
 dict_linelist_v1 <- read_xlsx(file.path(path_dictionaries, "archive", "dict_linelist_v1.1.xlsx")) # corrected MSF_readmission -> MSF_visit_type
 dict_linelist_v2 <- read_xlsx(file.path(path_dictionaries, "dict_linelist_v2.0.xlsx"))
-dict_linelist <- read_xlsx(file.path(path_dictionaries, "dict_linelist_v3.0.xlsx"))
+dict_linelist <- read_xlsx(file.path(path_dictionaries, "dict_linelist_v3.2.xlsx"))
 dict_facilities <- read_xlsx(file.path(path_dictionaries, "dict_facilities.xlsx"))
 dict_factors <- read_xlsx(file.path(path_dictionaries, "dict_factors.xlsx"))
 dict_countries <- read_xlsx(path_dict_countries)
@@ -73,7 +73,7 @@ dict_factors_correct <- read_xlsx(file.path(path_dictionaries, "dict_factors_cor
 dict_countries_correct <- read_xlsx(file.path(path_dictionaries, "dict_countries_correct.xlsx"))
 
 vars_date <- c("upload_date", dict_linelist$code_name[dict_linelist$data_type == "Date"])
-
+vars_numeric <- dict_linelist$code_name[dict_linelist$data_type == "Number"]
 
 ### Vector of ISO3 country codes for which we have linelists in data-raw
 country_dirs <- list_dirs(path_data_raw, pattern = "linelist\\/[[:alpha:]]{3}$")
