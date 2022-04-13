@@ -1,13 +1,22 @@
 #' Import AFG_P_GZG from REDCap clinical linelist
 #' 
+#' @param min_date Min date threshold for var pat_arrival_dt
+#'   (MSF_date_consultation). Previous entries from intersectional ll.
 #' 
-import_other_afg_redcap <- function(path_linelist_other, dict_linelist) {
+import_other_afg_redcap <- function(path_linelist_other,
+                                    dict_linelist,
+                                    min_date = as.Date("2021-03-01")) {
   
   ## requires ------------------------------------------------------------------
   source("R/zzz.R")
   source("R/utilities.R")
   library(redcap)  # remotes::install_github("epicentre-msf/redcap")
 
+  # if running manually
+  if (FALSE) {
+    min_date = as.Date("2021-03-01")
+  }
+  
   
   ## mapping files -------------------------------------------------------------
   path_to_files <- file.path(path_linelist_other, "OCP", "AFG REDCap")
@@ -59,8 +68,8 @@ import_other_afg_redcap <- function(path_linelist_other, dict_linelist) {
     select(-starts_with("redcap")) %>% 
     left_join(select(db_testing, -starts_with("redcap")), by = "rec") %>%
     left_join(select(db$discharge, -starts_with("redcap")), by = "rec") %>%
-    left_join(dict_facilities_join, by = "site")
-  
+    left_join(dict_facilities_join, by = "site") %>% 
+    filter(pat_arrival_dt > min_date)  # prev entries covered in intersectional ll
   
   ## derived variables ---------------------------------------------------------
   test_set_equal(d_orig$cvd_method, c("pcr", "antigen detection", "other", NA))
@@ -190,6 +199,7 @@ import_other_afg_redcap <- function(path_linelist_other, dict_linelist) {
   ## add metadata and patient_id -----------------------------------------------
   df_data <- d_out %>% 
     mutate(
+      across(everything(), as.character),
       linelist_row = 1:n(),
       patient_id = paste(site, format_text(MSF_N_Patient), sep = "_"),
       db_row = 1:n(),
@@ -226,7 +236,11 @@ if (FALSE) {
   
   
   ## import via REDCap clinical DB
-  d_redcap <- import_other_afg_redcap(path_linelist_other, dict_linelist)
+  d_redcap <- import_other_afg_redcap(
+    path_linelist_other,
+    dict_linelist,
+    min_date = as.Date("2020-01-01")
+  )
   
   path_onedrive <- file.path(path_linelist_other, "OCP", "AFG REDCap")
   
@@ -258,6 +272,11 @@ if (FALSE) {
   
   intersect(d_redcap_after$MSF_N_Patient, d_linelist$MSF_N_Patient)
   intersect(d_linelist$MSF_N_Patient, d_redcap_after$MSF_N_Patient)
+  
+  d_redcap_clean %>% 
+    filter(MSF_date_consultation > as.Date("2021-03-01")) %>%
+    pull(MSF_date_consultation) %>%
+    range()
   
   ## compare -------------------------------------------------------------------
   d_redcap_clean <- d_redcap %>% 

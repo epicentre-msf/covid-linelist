@@ -39,6 +39,7 @@ id_oca_bgd_intersect <- ll_import_epicentre %>%
 
 
 ### Import non-intersectional linelists
+source("R/import_other_afg_redcap.R")
 source("R/import_other_afg_tri.R")
 source("R/import_other_bel_ocb.R")
 source("R/import_other_bel_ocb_gal.R")
@@ -59,6 +60,7 @@ source("R/import_other_yem_pra.R")
 source("R/import_other_bgd_godata.R")
 source("R/import_other_bgd_godata_ocp_crf1.R")
 
+ll_other_afg_redcap <- import_other_afg_redcap(path_linelist_other, dict_linelist)
 ll_other_afg_tri <- import_other_afg_tri(path_linelist_other, dict_linelist)
 ll_other_bel_ocb <- import_other_bel_ocb(path_linelist_other, dict_linelist)
 ll_other_bel_ocb_gal <- import_other_bel_ocb_gal(path_linelist_other, dict_linelist)
@@ -84,6 +86,7 @@ ll_other_bgd_godata_ocp1 <- import_other_bgd_godata_ocp_crf1(path_linelist_other
 ### Bind Intersectional and Other imports
 ll_import <- dplyr::bind_rows(
   ll_import_epicentre,
+  ll_other_afg_redcap,
   ll_other_afg_tri,
   ll_other_bel_ocb,
   ll_other_bel_ocb_gal,
@@ -119,11 +122,23 @@ queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE)
 # check for patient_id dropped since previous compilation
 # known issues:
 # - ETH_E_GRH (use patient names as IDs)
-llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
-  readRDS() %>%
+ll_prev <- llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
+  readRDS()
+
+# dropped IDs
+ll_prev %>%
   filter(!grepl("TEMPID_", MSF_N_Patient)) %>% 
   anti_join(ll_import, by = c("site", "MSF_N_Patient")) %>%
   count(site)
+
+# difference in # of entries
+left_join(
+  count(ll_prev, site, site_name, name = "n_old"),
+  count(ll_import, site, site_name, name = "n_new"),
+  by = c("site", "site_name")
+) %>% 
+  mutate(diff = n_new - n_old) %>% 
+  filter(diff != 0)
 
 
 # save raw country-specific RDS files
