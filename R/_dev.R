@@ -319,6 +319,53 @@ OC_list <- OC_list[!grepl("/", OC_list)]
 # memory.limit()
 # gc(full = TRUE)
 
+
+
+# Export file summarizing changes (new, updated, dropped) for OCBA HIS
+d_ocba <- filter(d_global_his, OC %in% "OCBA")
+
+d_ocba_long <- d_ocba %>% 
+  mutate(across(everything(), as.character)) %>% 
+  select(-db_row, -linelist_row, -upload_date) %>% 
+  pivot_longer(cols = !patient_id)
+
+d_ocba_prev <- list.files(file.path(path_export, "OCBA"), pattern = "^msf_covid19_linelist_ocba", full.names = TRUE) %>% 
+  max() %>% 
+  readxl::read_xlsx(guess_max = 1e5)
+
+d_ocba_prev_long <- d_ocba_prev %>% 
+  mutate(across(everything(), as.character)) %>% 
+  select(-db_row, -linelist_row, -upload_date) %>% 
+  pivot_longer(cols = !patient_id, values_to = "value_prev")
+
+d_ocba_join <- d_ocba_long %>% 
+  inner_join(d_ocba_prev_long, by = c("patient_id", "name")) %>% 
+  mutate(across(c(value, value_prev), ~ if_else(is.na(.x), "<missing>", .x))) %>% 
+  mutate(across(c(value, value_prev), ~ if_else(name %in% "MSF_admin_location_past_week", stringr::str_squish(.x), .x)))
+
+d_ocba_updated <- d_ocba_join %>% 
+  filter(value != value_prev) %>% 
+  distinct(patient_id) %>% 
+  left_join(d_ocba, by = "patient_id")
+
+d_ocba_new <- d_ocba %>% 
+  filter(!patient_id %in% d_ocba_prev$patient_id)
+
+d_ocba_dropped <- d_ocba_prev %>% 
+  anti_join(d_ocba, by = "patient_id") %>% 
+  distinct(patient_id)
+
+qxl::qxl(
+  list(
+    new = d_ocba_new,
+    updated = d_ocba_updated,
+    dropped = d_ocba_dropped
+  ),
+  file.path(path_export, "OCBA", glue::glue("msf_covid19_linelist_updates_ocba_{lubridate::today()}.xlsx"))
+)
+
+
+# Standard exports for all OCs
 if (FALSE) {
   for (OC_focal in OC_list) {
     file_out_oc <- glue::glue("msf_covid19_linelist_{tolower(OC_focal)}_{lubridate::today()}.xlsx")
