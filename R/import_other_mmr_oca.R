@@ -132,8 +132,10 @@ import_other_mmr_oca <- function(path_linelist_other, dict_linelist) {
     "[SAM] Severe acute malnutrition",
     "[LRT] Lower respiratory tract infection",
     "[NHT] Neonatal hypothermia",
+    "[PA] Psychosis, acute",
     NA
   )
+  
   test_set_equal(
     d_orig$diagnosis_at_exit_primary,
     allowed_diagnosis
