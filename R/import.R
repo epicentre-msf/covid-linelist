@@ -27,7 +27,7 @@ import_linelists <- function(country,
   source("R/import.R")
   
   if (FALSE) {
-    country <- "CAF"
+    country <- "MWI"
     site_exclude <- NULL
   }
   
@@ -210,6 +210,8 @@ scan_sheets <- function(path_data_raw,
     mutate(path_parse = gsub(reg_rm, "", file_path)) %>% 
     mutate(path_parse = gsub("lon_.+_(?=202[0123])", "0000__", path_parse, perl = TRUE)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{2}") %>% 
+    # all entries from QECH-A and QECH-B merged into QECH-C file as of 2022-04-26
+    filter(!(country %in% "MWI" & site_name %in% c("QECH-A", "QECH-B"))) %>%
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
     mutate(site_name_join = format_text2(site_name)) %>% 
     select(-site_name, -project, -key) %>% 
