@@ -118,7 +118,6 @@ queryr::query(ll_import, is.na(upload_date), cols_base = c(country, OC), count =
 queryr::query(ll_import, is.na(country), cols_base = c(country, OC), count = TRUE) #!!!
 queryr::query(ll_import, is.na(shape), cols_base = c(country, OC), count = TRUE) #!!!
 
-
 # check for patient_id dropped since previous compilation
 # known issues:
 # - ETH_E_GRH (use patient names as IDs)
@@ -162,11 +161,10 @@ ll_cleaned <- ll_import %>%
   mutate(MSF_N_Patient = ifelse(site == "ETH_E_GRH", NA_character_, MSF_N_Patient)) %>%
   # temp solution for AFG_P_GZG to fix expo_contact_case
   mutate(
-    expo_contact_case = 
-      case_when(
-        site == "AFG_P_GZG" & is.na(expo_contact_case) ~ extra__expo_contact_case,
-        TRUE ~ expo_contact_case
-      )
+    expo_contact_case = case_when(
+      site == "AFG_P_GZG" & is.na(expo_contact_case) ~ extra__expo_contact_case,
+      TRUE ~ expo_contact_case
+    )
   ) %>% 
   clean_linelist(
     path_dictionaries,
@@ -181,7 +179,6 @@ ll_cleaned <- ll_import %>%
     write_checks = TRUE # Can set to FALSE to debug
   )
 
-
 matchmaker::check_df(
   ll_cleaned,
   dict_factors,
@@ -189,6 +186,13 @@ matchmaker::check_df(
   col_vars = "variable",
   always_allow_na = TRUE
 )
+
+# dbc::check_categorical(
+#   ll_cleaned,
+#   dict_factors,
+#   fn = identity,
+#   col_allowed_value = "values_en"
+# )
 
 purrr::walk(
   sort(unique(ll_cleaned$country)),
@@ -207,11 +211,13 @@ ll_geocode <- purrr::map_dfr(
   write_checks = TRUE
 )
 
+
 # fetch_georef("COD") %>%
 #   filter(adm1 == "Miranda") %>%
 #   filter(grepl("altos", pcode, ignore.case = TRUE))
 # 
-# View(fetch_georef("AFG"))
+# View(fetch_georef("COD"))
+
 
 
 # check again for missing values among important columns
@@ -260,7 +266,6 @@ llutils::list_files(path_export_global, "\\.rds$", select = "latest") %>%
   readRDS() %>% 
   anti_join(d_global, by = "patient_id") %>%
   count(site)
-
 
 # double-check for allowed values
 matchmaker::check_df(
@@ -320,50 +325,55 @@ OC_list <- OC_list[!grepl("/", OC_list)]
 # gc(full = TRUE)
 
 
-
 # Export file summarizing changes (new, updated, dropped) for OCBA HIS
-d_ocba <- filter(d_global_his, OC %in% "OCBA")
-
-d_ocba_long <- d_ocba %>% 
-  mutate(across(everything(), as.character)) %>% 
-  select(-db_row, -linelist_row, -upload_date) %>% 
-  pivot_longer(cols = !patient_id)
-
-d_ocba_prev <- list.files(file.path(path_export, "OCBA"), pattern = "^msf_covid19_linelist_ocba", full.names = TRUE) %>% 
-  max() %>% 
-  readxl::read_xlsx(guess_max = 1e5)
-
-d_ocba_prev_long <- d_ocba_prev %>% 
-  mutate(across(everything(), as.character)) %>% 
-  select(-db_row, -linelist_row, -upload_date) %>% 
-  pivot_longer(cols = !patient_id, values_to = "value_prev")
-
-d_ocba_join <- d_ocba_long %>% 
-  inner_join(d_ocba_prev_long, by = c("patient_id", "name")) %>% 
-  mutate(across(c(value, value_prev), ~ if_else(is.na(.x), "<missing>", .x))) %>% 
-  mutate(across(c(value, value_prev), ~ if_else(name %in% "MSF_admin_location_past_week", stringr::str_squish(.x), .x)))
-
-d_ocba_updated <- d_ocba_join %>% 
-  filter(value != value_prev) %>% 
-  distinct(patient_id) %>% 
-  left_join(d_ocba, by = "patient_id")
-
-d_ocba_new <- d_ocba %>% 
-  filter(!patient_id %in% d_ocba_prev$patient_id)
-
-d_ocba_dropped <- d_ocba_prev %>% 
-  anti_join(d_ocba, by = "patient_id") %>% 
-  distinct(patient_id)
-
-qxl::qxl(
-  list(
-    new = d_ocba_new,
-    updated = d_ocba_updated,
-    dropped = d_ocba_dropped
-  ),
-  file.path(path_export, "OCBA", glue::glue("msf_covid19_linelist_updates_ocba_{lubridate::today()}.xlsx"))
-)
-
+for (OC_focal in c("OCBA", "OCP")) {
+  
+  # account for sites run by 2+ OCs
+  OC_focal_sub <- OC_focal
+  if (OC_focal_sub %in% c("OCB", "OCP")) OC_focal_sub <- c(OC_focal_sub, "OCB/OCP")
+  
+  d_his <- filter(d_global_his, OC %in% OC_focal_sub)
+  
+  d_his_long <- d_his %>% 
+    mutate(across(everything(), as.character)) %>% 
+    select(-db_row, -linelist_row, -upload_date) %>% 
+    pivot_longer(cols = !patient_id)
+  
+  d_his_prev <- list.files(file.path(path_export, OC_focal), pattern = "^msf_covid19_linelist_oc(a|b|g|p|ba)_", full.names = TRUE) %>% 
+    max() %>%
+    readxl::read_xlsx(guess_max = 1e6)
+  
+  d_his_prev_long <- d_his_prev %>% 
+    mutate(across(everything(), as.character)) %>% 
+    select(-db_row, -linelist_row, -upload_date) %>% 
+    pivot_longer(cols = !patient_id, values_to = "value_prev")
+  
+  d_his_join <- d_his_long %>% 
+    inner_join(d_his_prev_long, by = c("patient_id", "name")) %>% 
+    mutate(across(c(value, value_prev), ~ if_else(is.na(.x), "<missing>", .x))) %>% 
+    mutate(across(c(value, value_prev), ~ if_else(name %in% "MSF_admin_location_past_week", stringr::str_squish(.x), .x)))
+  
+  d_his_updated <- d_his_join %>% 
+    filter(value != value_prev) %>% 
+    distinct(patient_id) %>% 
+    inner_join(d_his, ., by = "patient_id")
+  
+  d_his_new <- d_his %>% 
+    filter(!patient_id %in% d_his_prev$patient_id)
+  
+  d_his_dropped <- d_his_prev %>% 
+    anti_join(d_his, by = "patient_id") %>% 
+    distinct(patient_id)
+  
+  qxl::qxl(
+    list(
+      new = d_his_new,
+      updated = d_his_updated,
+      dropped = d_his_dropped
+    ),
+    file.path(path_export, OC_focal, glue::glue("msf_covid19_linelist_updates_{tolower(OC_focal)}_{lubridate::today()}.xlsx"))
+  )
+}
 
 # Standard exports for all OCs
 if (FALSE) {
