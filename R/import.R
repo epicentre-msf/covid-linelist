@@ -211,7 +211,8 @@ scan_sheets <- function(path_data_raw,
     mutate(path_parse = gsub("lon_.+_(?=202[0123])", "0000__", path_parse, perl = TRUE)) %>% 
     tidyr::separate(path_parse, vars_parse, sep = "_{2}") %>% 
     # all entries from QECH-A and QECH-B merged into QECH-C file as of 2022-04-26
-    filter(!(country %in% "MWI" & site_name %in% c("QECH-A", "QECH-B"))) %>%
+    # update: as of 2022-07-28, now appear file QECH-A contains all combined entries + is being continued
+    filter(!(country %in% "MWI" & site_name %in% c("QECH-B", "QECH-C"))) %>%
     mutate_all(~ ifelse(.x == "", NA_character_, .x)) %>% 
     mutate(site_name_join = format_text2(site_name)) %>% 
     select(-site_name, -project, -key) %>% 
