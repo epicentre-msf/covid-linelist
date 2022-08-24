@@ -15,21 +15,26 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   library(dplyr)
   library(hmatch)
   library(rlang)
-  source("R/import_other_bgd_godata_ocp_crf1.R")
+  source("R/import_other_bgd_godata.R")
   
   ## site metadata
   dict_facilities_join <- dict_facilities %>% 
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  ## initial import
+  ## paths
   path_to_files <- file.path(path_linelist_other, "OCBA", "BGD")
   path_to_files_ocp <- file.path(path_linelist_other, "OCP", "BGD")
   
+  ## mapping files
+  map_ocp_new <- readxl::read_xlsx(file.path(path_to_files_ocp, "varname_mapping_ocp_bgd.xlsx"))
+  map_occupations <- readxl::read_xlsx(file.path(path_to_files, "map_occupations.xlsx"))
+  
+  ## initial import
   files_ll <- c(
     BGD_P_IPD = llutils::list_files(
       path_to_files_ocp,
-      pattern = "BGD_OCP.*\\.xlsx",
+      pattern = "BGD_OCP.*IPD.*\\.xlsx",
       select = "latest"
     )
   )
@@ -37,7 +42,8 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
   d_orig <- purrr::map2_dfr(
     files_ll,
     names(files_ll),
-    import_go_data_
+    import_go_data_,
+    map_ocp_new = map_ocp_new
   ) %>% 
     filter(is.na(`_Select your agency`)) # limit to CRF1
   
@@ -46,9 +52,7 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
     std = janitor::make_clean_names(names(d_orig))
   )
   
-  ## mapping file
-  map_occupations <- readxl::read_xlsx(file.path(path_to_files, "map_occupations.xlsx"))
-  
+  ## mapping
   df_map <- file.path(path_to_files_ocp, "LL_v2.1_mapping_template_go_data_crf1.xlsx") %>% 
     readxl::read_xlsx() %>% 
     select(1, 7, 8, 9, 10) %>% 
@@ -288,87 +292,4 @@ import_other_bgd_godata_ocp_crf1 <- function(path_linelist_other, dict_linelist,
 }
 
 
-
-import_go_data_ <- function(path, site) {
-  
-  d <- readxl::read_xlsx(
-    path, 
-    col_types = "text",
-    na = c("", "NA"),
-    .name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE)
-  ) %>%
-    janitor::remove_empty("rows") %>% 
-    select(-matches("\\[MV 1\\] [2-9]")) %>% 
-    setNames(gsub(" +\\[MV 1\\]( \\d)*$", "", names(.)))
-  
-  # remove WHO CRF entries for OCA, which overlap with data in intersectional LL
-  if (site %in% c("BGD_A_KUT", "BGD_A_BAL")) {
-    d <- d %>% 
-      filter(!is.na(`_Health Facility`))
-  }
-  
-  # remove duplicated column "Type" and "Type [MV 1]"
-  d <- d[,!(names(d) %in% "Type" & vapply(d, function(x) all(is.na(x)), FALSE))]
-  
-    
-  d %>% 
-    mutate(linelist_row = 1:n(),
-           upload_date = as.character(llutils::extract_date(path)),
-           linelist_lang = "English",
-           linelist_vers = "Go Data",
-           site = site)
-}
-
-
-collapse_unique <- function(..., to_chr = FALSE) {
-  x <- unique(c(..., use.names = FALSE))
-  if (any(!is.na(x))) {
-    x <- x[!is.na(x)]
-  }
-  
-  if (to_chr) {
-    x <- paste(x, collapse = "; ")
-  }
-  x
-}
-
-
-extract_main_comp <- function(x) {
-  
-  main_comp <- c(
-    "Coma",
-    "Convulsion",
-    "Renal distress",
-    "Acute respiratory distress syndrome (ARDS)"
-  )
-  
-  if (length(x) == 1 && x %in% main_comp) {
-    out <- x
-  } else {
-    out <- NA
-  } 
-  
-  out
-}
-
-
-extract_other_comp <- function(x) {
-  
-  main_comp <- c(
-    "Coma",
-    "Convulsion",
-    "Renal distress",
-    "Acute respiratory distress syndrome (ARDS)"
-  )
-  
-  if (length(x) == 1 && x %in% main_comp) {
-    out <- NA
-  } else if (all(is.na(x))) {
-    out <- NA
-  } else {
-    out <- paste(x, collapse = "; ")
-  }
-  
-  out
-}
 

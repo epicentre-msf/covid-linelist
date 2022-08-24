@@ -131,11 +131,12 @@ ll_prev %>%
   count(site)
 
 # difference in # of entries
-left_join(
+full_join(
   count(ll_prev, site, site_name, name = "n_old"),
   count(ll_import, site, site_name, name = "n_new"),
   by = c("site", "site_name")
 ) %>% 
+  mutate(n_old = if_else(is.na(n_old), 0L, n_old)) %>% 
   mutate(diff = n_new - n_old) %>% 
   filter(diff != 0)
 

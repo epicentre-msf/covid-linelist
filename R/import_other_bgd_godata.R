@@ -22,11 +22,16 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, vars_dat
     mutate_all(as.character) %>% 
     select(site, country, shape, OC, project, site_name, site_type, uid)
   
-  ## initial import
+  ## paths
   path_to_files <- file.path(path_linelist_other, "OCBA", "BGD")
   path_to_files_oca <- file.path(path_linelist_other, "OCA", "BGD")
   path_to_files_ocp <- file.path(path_linelist_other, "OCP", "BGD")
   
+  ## mapping files
+  map_ocp_new <- readxl::read_xlsx(file.path(path_to_files_ocp, "varname_mapping_ocp_bgd.xlsx"))
+  map_occupations <- readxl::read_xlsx(file.path(path_to_files, "map_occupations.xlsx"))
+  
+  ## initial import
   files_ll <- c(
     BGD_E_UMS = llutils::list_files(
       path_to_files,
@@ -60,7 +65,12 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, vars_dat
     ),
     BGD_P_IPD = llutils::list_files(
       path_to_files_ocp,
-      pattern = "BGD_OCP.*\\.xlsx",
+      pattern = "BGD_OCP.*IPD2.*\\.xlsx",
+      select = "latest"
+    ),
+    BGD_P_GYL= llutils::list_files(
+      path_to_files_ocp,
+      pattern = "BGD_OCP.*GYL.*\\.xlsx",
       select = "latest"
     )
   )
@@ -68,7 +78,8 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, vars_dat
   d_orig <- purrr::map2_dfr(
     files_ll,
     names(files_ll),
-    import_go_data_
+    import_go_data_,
+    map_ocp_new = map_ocp_new
   ) %>% 
     filter(!(site == "BGD_P_IPD" & is.na(`_Select your agency`))) # remove old CRF rows
   
@@ -77,9 +88,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, vars_dat
     std = janitor::make_clean_names(names(d_orig))
   )
   
-  ## mapping file
-  map_occupations <- readxl::read_xlsx(file.path(path_to_files, "map_occupations.xlsx"))
-  
+  ## mapping
   df_map <- file.path(path_to_files, "LL_v2.1_mapping_template_go_data.xlsx") %>% 
     readxl::read_xlsx() %>% 
     select(1, 7, 8, 9, 10) %>% 
@@ -100,6 +109,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, vars_dat
   df_map_derive <- df_map %>% 
     filter(map_type == "Requires derivation") %>% 
     select(var_epi, map_derive)
+  
   
   ### clean names and join site metadata
   d_orig <- d_orig %>% 
@@ -304,8 +314,7 @@ import_other_bgd_godata <- function(path_linelist_other, dict_linelist, vars_dat
 }
 
 
-
-import_go_data_ <- function(path, site) {
+import_go_data_ <- function(path, site, map_ocp_new = NULL) {
   
   d <- readxl::read_xlsx(
     path, 
@@ -316,6 +325,13 @@ import_go_data_ <- function(path, site) {
     janitor::remove_empty("rows") %>% 
     select(-matches("\\[MV 1\\] [2-9]")) %>% 
     setNames(gsub(" +\\[MV 1\\]( \\d)*$", "", names(.)))
+  
+  if (site %in% c("BGD_P_IPD", "BGD_P_GYL")) {
+    d <- d %>% 
+      rename(
+        !!!any_of(setNames(map_ocp_new$new, map_ocp_new$old))
+      )
+  }
   
   # remove duplicated column "Type" and "Type [MV 1]"
   d <- d[,!(names(d) %in% "Type" & vapply(d, function(x) all(is.na(x)), FALSE))]
